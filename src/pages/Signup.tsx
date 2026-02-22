@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Scissors } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -74,10 +74,7 @@ const Signup = () => {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-4">
-          <div className="mx-auto w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <Scissors className="w-10 h-10 text-primary" />
-          </div>
-          <h1 className="text-4xl font-bold tracking-wider text-foreground uppercase">Relíquia Barber</h1>
+          <img src={logo} alt="Relíquia Barber" className="mx-auto w-32 h-32 object-contain" />
           <p className="text-muted-foreground">Crie sua conta</p>
         </div>
 
