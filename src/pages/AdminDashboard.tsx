@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
-import { Users, Calendar, DollarSign, Bell, CheckCircle } from "lucide-react";
+import { Users, Calendar, DollarSign, Bell, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -83,6 +84,17 @@ const AdminDashboard = () => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   };
 
+  const cancelAppointment = async (id: string) => {
+    const { error } = await supabase.from("appointments").delete().eq("id", id);
+    if (error) {
+      toast.error("Erro ao cancelar: " + error.message);
+    } else {
+      toast.success("Agendamento cancelado!");
+      setTodayAppointments((prev) => prev.filter((a) => a.id !== id));
+      await loadData();
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
@@ -151,7 +163,15 @@ const AdminDashboard = () => {
                         <p className="font-medium text-foreground">{a.client_name || "Cliente"}</p>
                         <p className="text-xs text-muted-foreground">{a.services?.name || "Serviço"}</p>
                       </div>
-                      <span className="text-primary font-semibold">{a.appointment_time}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-primary font-semibold">{a.appointment_time}</span>
+                        <button
+                          onClick={() => cancelAppointment(a.id)}
+                          className="text-destructive hover:text-destructive/80 text-xs font-medium"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
