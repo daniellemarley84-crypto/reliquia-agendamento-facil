@@ -49,11 +49,44 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           birth_date: string | null
           created_at: string
           id: string
+          is_admin: boolean
           name: string
           phone: string | null
           user_id: string
@@ -62,6 +95,7 @@ export type Database = {
           birth_date?: string | null
           created_at?: string
           id?: string
+          is_admin?: boolean
           name: string
           phone?: string | null
           user_id: string
@@ -70,6 +104,7 @@ export type Database = {
           birth_date?: string | null
           created_at?: string
           id?: string
+          is_admin?: boolean
           name?: string
           phone?: string | null
           user_id?: string
