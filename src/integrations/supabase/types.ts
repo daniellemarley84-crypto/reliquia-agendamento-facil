@@ -18,25 +18,31 @@ export type Database = {
         Row: {
           appointment_date: string
           appointment_time: string
+          combo: boolean
           created_at: string
           id: string
           service_id: string
+          status: string
           user_id: string
         }
         Insert: {
           appointment_date: string
           appointment_time: string
+          combo?: boolean
           created_at?: string
           id?: string
           service_id: string
+          status?: string
           user_id: string
         }
         Update: {
           appointment_date?: string
           appointment_time?: string
+          combo?: boolean
           created_at?: string
           id?: string
           service_id?: string
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -45,38 +51,6 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      notifications: {
-        Row: {
-          appointment_id: string | null
-          created_at: string
-          id: string
-          is_read: boolean
-          message: string
-        }
-        Insert: {
-          appointment_id?: string | null
-          created_at?: string
-          id?: string
-          is_read?: boolean
-          message: string
-        }
-        Update: {
-          appointment_id?: string | null
-          created_at?: string
-          id?: string
-          is_read?: boolean
-          message?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_appointment_id_fkey"
-            columns: ["appointment_id"]
-            isOneToOne: false
-            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
         ]
@@ -114,18 +88,24 @@ export type Database = {
       services: {
         Row: {
           created_at: string
+          descricao: string | null
+          duracao_minutos: number | null
           id: string
           name: string
           price: number
         }
         Insert: {
           created_at?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
           id?: string
           name: string
           price?: number
         }
         Update: {
           created_at?: string
+          descricao?: string | null
+          duracao_minutos?: number | null
           id?: string
           name?: string
           price?: number
