@@ -1,4 +1,4 @@
-import { LayoutDashboard, LogOut, Bell } from "lucide-react";
+import { LayoutDashboard, LogOut, Scissors, DollarSign, CreditCard } from "lucide-react";
 import logo from "@/assets/logo.png";
 import {
   Sidebar,
@@ -10,12 +10,20 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+const menuItems = [
+  { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
+  { id: "servicos", title: "Serviços", icon: Scissors },
+  { id: "ganhos", title: "Ganhos", icon: DollarSign },
+  { id: "pagar", title: "Pagar", icon: CreditCard },
+];
+
 interface AdminSidebarProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   onLogout: () => void;
-  unreadCount: number;
 }
 
-export function AdminSidebar({ onLogout, unreadCount }: AdminSidebarProps) {
+export function AdminSidebar({ activeTab, onTabChange, onLogout }: AdminSidebarProps) {
   return (
     <Sidebar className="border-r border-border">
       <div className="p-6 flex flex-col items-center border-b border-border">
@@ -26,23 +34,17 @@ export function AdminSidebar({ onLogout, unreadCount }: AdminSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="bg-sidebar-accent text-primary font-medium">
-                  <LayoutDashboard className="mr-2 h-4 w-4" />
-                  <span>Dashboard</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="relative">
-                  <Bell className="mr-2 h-4 w-4" />
-                  <span>Notificações</span>
-                  {unreadCount > 0 && (
-                    <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5">
-                      {unreadCount}
-                    </span>
-                  )}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    onClick={() => onTabChange(item.id)}
+                    className={activeTab === item.id ? "bg-sidebar-accent text-primary font-medium" : ""}
+                  >
+                    <item.icon className="mr-2 h-4 w-4" />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
