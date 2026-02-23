@@ -85,9 +85,22 @@ const AdminDashboard = () => {
   };
 
   const cancelAppointment = async (id: string) => {
-    const { error } = await supabase.from("appointments").delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao cancelar: " + error.message);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-appointment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ appointment_id: id }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error("Erro ao cancelar: " + (data.error || "Erro desconhecido"));
     } else {
       toast.success("Agendamento cancelado!");
       setTodayAppointments((prev) => prev.filter((a) => a.id !== id));
