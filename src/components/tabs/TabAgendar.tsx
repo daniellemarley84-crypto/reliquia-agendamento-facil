@@ -673,7 +673,35 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
           style={{ width:"100%", padding:14, background:pronto?(hover?C.goldL:C.gold):C.bg4, border:pronto?"none":"1px solid #2e2b24", borderRadius:12, fontFamily:C.DM, fontSize:14, fontWeight:700, letterSpacing:2, color:pronto?C.bg:C.textD, cursor:pronto?"pointer":"not-allowed", textTransform:"uppercase", transition:"all 0.2s", marginTop:8, transform:pronto&&hover?"translateY(-1px)":"none", boxShadow:pronto&&hover?`0 6px 24px rgba(201,168,76,0.3)`:"none" }}
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
-          onClick={() => pronto && setConfirmado(true)}
+          onClick={async () => {
+            if (!pronto) return;
+            try {
+              const { supabase } = await import("@/integrations/supabase/client");
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) { alert("Você precisa estar logado."); return; }
+              const dateStr = `${data.ano}-${String(data.mes+1).padStart(2,"0")}-${String(data.dia).padStart(2,"0")}`;
+              // Use first selected service id or create a generic entry
+              const serviceName = combo ? combo.name : selecionados.map(id => allServicos.find(s=>s.id===id)?.name).filter(Boolean).join(", ");
+              // Find a matching service in DB or use first one
+              const { data: dbServices } = await supabase.from("services").select("id, name").limit(100);
+              let serviceId = dbServices?.[0]?.id;
+              if (dbServices) {
+                const match = dbServices.find(s => selecionados.some(sel => s.name.toLowerCase().includes(allServicos.find(x=>x.id===sel)?.name?.toLowerCase() || "")));
+                if (match) serviceId = match.id;
+              }
+              if (!serviceId) { alert("Nenhum serviço cadastrado no sistema."); return; }
+              const { error } = await supabase.from("appointments").insert({
+                user_id: session.user.id,
+                service_id: serviceId,
+                appointment_date: dateStr,
+                appointment_time: horario,
+                combo: !!combo,
+                status: "confirmado",
+              });
+              if (error) { alert("Erro ao agendar: " + error.message); return; }
+              setConfirmado(true);
+            } catch (err: any) { alert("Erro: " + err.message); }
+          }}
         >
           {pronto ? "Confirmar Agendamento ✓" : "Escolha data e horário"}
         </button>
