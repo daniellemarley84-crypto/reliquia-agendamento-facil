@@ -374,8 +374,8 @@ const HORARIOS = (() => {
   return slots;
 })();
 
-// Horários ocupados simulados (fixos)
-const BLOQUEADOS = new Set(["09:45","11:15","15:45","17:15","19:30"]);
+// Sem horários bloqueados fixos — todos disponíveis
+const BLOQUEADOS = new Set<string>();
 
 function getDiasDoMes(ano, mes) {
   const primeiroDia = new Date(ano, mes, 1).getDay();
