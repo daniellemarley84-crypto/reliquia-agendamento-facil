@@ -1,4 +1,4 @@
-import { Calendar, MapPin, MessageCircle, CreditCard, LogOut, User } from "lucide-react";
+import { Calendar, MapPin, MessageCircle, CreditCard, LogOut, User, Home } from "lucide-react";
 import logo from "@/assets/logo.png";
 import {
   Sidebar,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
+  { id: "inicio", title: "Início", icon: Home },
   { id: "perfil", title: "Perfil", icon: User },
   { id: "agendamentos", title: "Agendar", icon: Calendar },
   { id: "localizacao", title: "Localização", icon: MapPin },
