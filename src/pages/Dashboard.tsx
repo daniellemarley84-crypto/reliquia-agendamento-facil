@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { AgendamentoTab } from "@/components/tabs/AgendamentoTab";
+import TabAgendar from "@/components/tabs/TabAgendar";
+import TabInicio from "@/components/tabs/TabInicio";
 import { LocalizacaoTab } from "@/components/tabs/LocalizacaoTab";
 import { SuporteTab } from "@/components/tabs/SuporteTab";
 import { PagarTab } from "@/components/tabs/PagarTab";
@@ -11,6 +12,7 @@ import { PerfilTab } from "@/components/tabs/PerfilTab";
 import type { User } from "@supabase/supabase-js";
 
 const tabTitles: Record<string, string> = {
+  inicio: "Início",
   perfil: "Perfil",
   agendamentos: "Agendar",
   localizacao: "Localização",
@@ -20,7 +22,7 @@ const tabTitles: Record<string, string> = {
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState("perfil");
+  const [activeTab, setActiveTab] = useState("inicio");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,12 +46,13 @@ const Dashboard = () => {
 
   const renderTab = () => {
     switch (activeTab) {
+      case "inicio": return <TabInicio onNavigate={(tab: string) => setActiveTab(tab === "agendar" ? "agendamentos" : tab)} />;
       case "perfil": return <PerfilTab userId={user.id} />;
-      case "agendamentos": return <AgendamentoTab userId={user.id} />;
+      case "agendamentos": return <TabAgendar />;
       case "localizacao": return <LocalizacaoTab />;
       case "suporte": return <SuporteTab />;
       case "pagar": return <PagarTab userId={user.id} />;
-      default: return <PerfilTab userId={user.id} />;
+      default: return <TabInicio onNavigate={(tab: string) => setActiveTab(tab === "agendar" ? "agendamentos" : tab)} />;
     }
   };
 
