@@ -105,9 +105,6 @@ export default function TabInicio({ onNavigate }) {
                   e.currentTarget.parentElement.style.background = "#1a1a1a";
                 }}
               />
-              <span style={{ position:"absolute", color:"#333", fontSize:11, fontFamily:C.DM, pointerEvents:"none" }}>
-                {s.alt}
-              </span>
             </div>
           ))}
         </div>
@@ -116,7 +113,7 @@ export default function TabInicio({ onNavigate }) {
         {([["‹", { left: 10 } as React.CSSProperties, prev], ["›", { right: 10 } as React.CSSProperties, next]] as [string, React.CSSProperties, () => void][]).map(([ch, pos, fn]) => (
           <button key={ch} style={{
             position: "absolute", top: "50%", transform: "translateY(-50%)", ...pos,
-            background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)",
+            background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)",
             color: C.white, borderRadius: 6, width: 28, height: 32,
             fontSize: 22, fontWeight: 300, fontFamily: C.DM,
             cursor: "pointer", display: "flex", alignItems: "center",

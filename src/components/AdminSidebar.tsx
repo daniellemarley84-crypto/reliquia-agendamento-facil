@@ -1,4 +1,4 @@
-import { LayoutDashboard, LogOut, Scissors, DollarSign, CreditCard } from "lucide-react";
+import { LayoutDashboard, LogOut, Scissors, DollarSign, CalendarDays, Users } from "lucide-react";
 import logo from "@/assets/logo.png";
 import {
   Sidebar,
@@ -12,9 +12,10 @@ import {
 
 const menuItems = [
   { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
+  { id: "agendamentos", title: "Agendamentos", icon: CalendarDays },
+  { id: "cadastrantes", title: "Cadastros", icon: Users },
   { id: "servicos", title: "Serviços", icon: Scissors },
   { id: "ganhos", title: "Ganhos", icon: DollarSign },
-  { id: "pagar", title: "Pagar", icon: CreditCard },
 ];
 
 interface AdminSidebarProps {
