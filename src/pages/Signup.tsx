@@ -56,15 +56,15 @@ const Signup = () => {
       return;
     }
 
-    // Update profile with extra fields
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from("profiles").update({
-        birth_date: formattedBirth,
-        phone: phone.replace(/\D/g, ""),
-      }).eq("user_id", user.id);
-    }
-
+    // Wait for trigger to create profile, then update
+const { data: { user } } = await supabase.auth.getUser();
+if (user) {
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  await supabase.from("profiles").update({
+    birth_date: formattedBirth,
+    phone: phone.replace(/\D/g, ""),
+  }).eq("user_id", user.id);
+}
     setLoading(false);
     toast.success("Conta criada! Verifique seu email para confirmar.");
     navigate("/login");
