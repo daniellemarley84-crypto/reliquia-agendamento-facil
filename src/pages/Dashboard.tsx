@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AppSidebar } from "@/components/AppSidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import TabAgendar from "@/components/tabs/TabAgendar";
 import TabInicio from "@/components/tabs/TabInicio";
 import { LocalizacaoTab } from "@/components/tabs/LocalizacaoTab";
@@ -172,7 +173,8 @@ const Dashboard = () => {
     }
   };
 
-  return (
+return (
+    <SidebarProvider>
     <div className="min-h-screen bg-background" style={{ paddingBottom: 80 }}>
       {/* Sidebar overlay */}
       {sidebarOpen && (
@@ -271,9 +273,9 @@ const Dashboard = () => {
           0%, 100% { width: 10px; opacity: 0.35; box-shadow: 2px 0 10px rgba(212,175,55,0.3); }
           50% { width: 16px; opacity: 0.9; box-shadow: 2px 0 18px rgba(212,175,55,0.6); }
         }
-      `}</style>
+   </style>
     </div>
+    </SidebarProvider>
   );
 };
-
 export default Dashboard;
