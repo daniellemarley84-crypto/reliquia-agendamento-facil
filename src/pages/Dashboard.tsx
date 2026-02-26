@@ -159,7 +159,12 @@ const Dashboard = () => {
     setShowIndicator(true);
   };
 
-  if (!user) return null;
+  if (!user) return (
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0d0d0d", color: "#d4af37", fontSize: 18 }}>
+    Carregando...
+  </div>
+);
+
 
   const renderTab = () => {
     switch (activeTab) {
