@@ -267,13 +267,13 @@ return (
         })}
       </div>
 
-      {/* Pulse animation */}
+{/* Pulse animation */}
       <style>{`
         @keyframes sidebarPulse {
           0%, 100% { width: 10px; opacity: 0.35; box-shadow: 2px 0 10px rgba(212,175,55,0.3); }
           50% { width: 16px; opacity: 0.9; box-shadow: 2px 0 18px rgba(212,175,55,0.6); }
         }
-   </style>
+      `}</style>
     </div>
     </SidebarProvider>
   );
