@@ -56,11 +56,11 @@ export default function TabInicio({ onNavigate }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "28px 16px 32px", gap: 20,
+      padding: "28px 0 32px", gap: 20,
       background: C.black, minHeight: "100%", fontFamily: C.DM
     }}>
       {/* Logo / Título */}
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:"100%" }}>
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:"100%", padding: "0 16px" }}>
         <div style={{ width:48, height:1, background:C.white }} />
         <h1 style={{
           fontFamily: C.DM, color: C.white, fontSize: 12, fontWeight: 400,
@@ -78,9 +78,9 @@ export default function TabInicio({ onNavigate }) {
       {/* Carrossel */}
       <div
         style={{
-          position: "relative", width: "100%", maxWidth: 320,
-          aspectRatio: "4/3", borderRadius: 12, overflow: "hidden",
-          boxShadow: "0 4px 28px rgba(0,0,0,0.85), 0 0 0 1px #2a2a2a",
+          position: "relative", width: "100%",
+          aspectRatio: "4/3", overflow: "hidden",
+          boxShadow: "0 4px 28px rgba(0,0,0,0.85)",
           cursor: "grab", userSelect: "none", background: "#111"
         }}
         onMouseDown={onDown} onMouseUp={onUp}
@@ -101,8 +101,8 @@ export default function TabInicio({ onNavigate }) {
                 src={s.src} alt={s.alt} draggable={false}
                 style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
                 onError={e => {
-                  e.currentTarget.style.display = "none";
-                  e.currentTarget.parentElement.style.background = "#1a1a1a";
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  (e.currentTarget.parentElement as HTMLElement).style.background = "#1a1a1a";
                 }}
               />
             </div>
@@ -113,8 +113,8 @@ export default function TabInicio({ onNavigate }) {
         {([["‹", { left: 10 } as React.CSSProperties, prev], ["›", { right: 10 } as React.CSSProperties, next]] as [string, React.CSSProperties, () => void][]).map(([ch, pos, fn]) => (
           <button key={ch} style={{
             position: "absolute", top: "50%", transform: "translateY(-50%)", ...pos,
-            background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)",
-            color: C.white, borderRadius: 6, width: 28, height: 32,
+            background: "rgba(0,0,0,0.15)", border: "1px solid rgba(255,255,255,0.05)",
+            color: "rgba(255,255,255,0.5)", borderRadius: 6, width: 28, height: 32,
             fontSize: 22, fontWeight: 300, fontFamily: C.DM,
             cursor: "pointer", display: "flex", alignItems: "center",
             justifyContent: "center", padding: 0, zIndex: 10
@@ -142,13 +142,14 @@ export default function TabInicio({ onNavigate }) {
       <button
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          width: "100%", maxWidth: 320, padding: "14px 0",
+          width: "calc(100% - 32px)", maxWidth: 400, padding: "14px 0",
           background: hover ? "#e0e0e0" : C.white, color: C.black,
           border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700,
           letterSpacing: "0.18em", textTransform: "uppercase",
           fontFamily: C.DM, cursor: "pointer", transition: "all 0.2s",
           transform: hover ? "translateY(-1px)" : "none",
-          boxShadow: hover ? "0 6px 20px rgba(255,255,255,0.12)" : "0 2px 10px rgba(255,255,255,0.06)"
+          boxShadow: hover ? "0 6px 20px rgba(255,255,255,0.12)" : "0 2px 10px rgba(255,255,255,0.06)",
+          margin: "0 16px",
         }}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
@@ -156,10 +157,6 @@ export default function TabInicio({ onNavigate }) {
       >
         <span style={{ fontSize:15 }}>✂</span> AGENDAR AGORA
       </button>
-
-      <p style={{ fontFamily:C.DM, color:"#444", fontSize:10, letterSpacing:"0.15em", textTransform:"uppercase", margin:0 }}>
-        Deslize para explorar
-      </p>
     </div>
   );
 }

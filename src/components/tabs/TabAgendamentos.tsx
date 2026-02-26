@@ -1,11 +1,5 @@
-import { useState } from "react";
-
-if (!document.querySelector('link[href*="DM+Sans"]')) {
-  const l = document.createElement("link");
-  l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap";
-  document.head.appendChild(l);
-}
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const T = {
   bg1:   "#0e0d0a",
@@ -24,29 +18,81 @@ const T = {
   DM:    "'DM Sans', sans-serif",
 };
 
-const mockAgendamentos = [
-  { id:"A001", cliente:"Carlos Mendes",  servico:"Corte e Barba",      data:"25/02/2025", hora:"09:00", valor:"R$35", status:"confirmado" },
-  { id:"A002", cliente:"Rafael Lima",    servico:"Corte",               data:"25/02/2025", hora:"09:45", valor:"R$20", status:"confirmado" },
-  { id:"A003", cliente:"Gustavo Rocha",  servico:"Luzes e Corte",       data:"25/02/2025", hora:"10:30", valor:"R$60", status:"pendente"   },
-  { id:"A004", cliente:"Lucas Ferreira", servico:"Corte e Sobrancelha", data:"26/02/2025", hora:"09:00", valor:"R$25", status:"confirmado" },
-  { id:"A005", cliente:"Carlos Mendes",  servico:"Barba",               data:"26/02/2025", hora:"10:30", valor:"R$20", status:"pendente"   },
-];
-
-const statusColor = (s) => s === "confirmado" ? T.green : T.gold;
-
+const statusColor = (s: string) => s === "confirmado" ? T.green : T.gold;
 const FILTROS = ["todos", "confirmado", "pendente"];
 
+interface Agendamento {
+  id: string;
+  cliente: string;
+  servico: string;
+  data: string;
+  hora: string;
+  valor: string;
+  status: string;
+}
+
 export default function TabAgendamentos() {
-  const [agendamentos, setAgendamentos] = useState(mockAgendamentos);
-  const [filtro,       setFiltro]       = useState("todos");
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [filtro, setFiltro] = useState("todos");
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { data: appts } = await supabase
+        .from("appointments")
+        .select("id, appointment_date, appointment_time, status, combo, service_id, user_id")
+        .order("appointment_date", { ascending: false })
+        .limit(100);
+
+      if (appts && appts.length > 0) {
+        const serviceIds = [...new Set(appts.map(a => a.service_id))];
+        const userIds = [...new Set(appts.map(a => a.user_id))];
+        
+        const { data: services } = await supabase.from("services").select("id, name, price").in("id", serviceIds);
+        const { data: profiles } = await supabase.from("profiles").select("user_id, name").in("user_id", userIds);
+        
+        const serviceMap = new Map((services || []).map(s => [s.id, s]));
+        const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+
+        setAgendamentos(appts.map(a => {
+          const svc = serviceMap.get(a.service_id);
+          const [y, m, d] = a.appointment_date.split("-");
+          return {
+            id: a.id,
+            cliente: profileMap.get(a.user_id) || "Cliente",
+            servico: svc?.name || "Serviço",
+            data: `${d}/${m}/${y}`,
+            hora: a.appointment_time,
+            valor: `R$${Number(svc?.price || 0).toFixed(0)}`,
+            status: a.status,
+          };
+        }));
+      } else {
+        setAgendamentos([]);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar agendamentos:", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   const visible = agendamentos.filter(a => filtro === "todos" || a.status === filtro);
 
-  const cancelar  = (id) => setAgendamentos(prev => prev.filter(a => a.id !== id));
-  const confirmar = (id) => setAgendamentos(prev => prev.map(a => a.id === id ? { ...a, status:"confirmado" } : a));
+  const cancelar = async (id: string) => {
+    await supabase.from("appointments").delete().eq("id", id);
+    setAgendamentos(prev => prev.filter(a => a.id !== id));
+  };
+
+  const confirmar = async (id: string) => {
+    await supabase.from("appointments").update({ status: "confirmado" }).eq("id", id);
+    setAgendamentos(prev => prev.map(a => a.id === id ? { ...a, status: "confirmado" } : a));
+  };
 
   const totalFiltro = visible.length;
-  const totalValor  = visible
+  const totalValor = visible
     .filter(a => a.status === "confirmado")
     .reduce((s, a) => s + parseInt(a.valor.replace("R$", "")), 0);
 
@@ -85,7 +131,8 @@ export default function TabAgendamentos() {
 
       {/* Lista */}
       <div style={{ display:"flex", flexDirection:"column", gap:8, padding:"4px 24px 32px" }}>
-        {visible.length === 0 && (
+        {loading && <div style={{ textAlign:"center", padding:"40px 0", color:T.textD, fontSize:12 }}>Carregando...</div>}
+        {!loading && visible.length === 0 && (
           <div style={{ textAlign:"center", padding:"40px 0", color:T.textD, fontSize:12, letterSpacing:"0.1em", textTransform:"uppercase" }}>Nenhum agendamento</div>
         )}
 

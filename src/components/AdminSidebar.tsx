@@ -1,5 +1,6 @@
-import { LayoutDashboard, LogOut, Scissors, DollarSign, CalendarDays, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, Scissors, DollarSign, CalendarDays, Users, Image } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { CarouselPanel } from "@/components/admin/CarouselManager";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +17,7 @@ const menuItems = [
   { id: "cadastrantes", title: "Cadastros", icon: Users },
   { id: "servicos", title: "Serviços", icon: Scissors },
   { id: "ganhos", title: "Ganhos", icon: DollarSign },
+  { id: "carousel", title: "Carrossel", icon: Image },
 ];
 
 interface AdminSidebarProps {
@@ -44,6 +46,11 @@ export function AdminSidebar({ activeTab, onTabChange, onLogout }: AdminSidebarP
                     <item.icon className="mr-2 h-4 w-4" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
+                  {item.id === "carousel" && activeTab === "carousel" && (
+                    <div className="px-2 py-2">
+                      <CarouselPanel />
+                    </div>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
