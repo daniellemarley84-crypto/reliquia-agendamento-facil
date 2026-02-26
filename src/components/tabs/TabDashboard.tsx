@@ -1,11 +1,5 @@
-import { useState } from "react";
-
-if (!document.querySelector('link[href*="DM+Sans"]')) {
-  const l = document.createElement("link");
-  l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap";
-  document.head.appendChild(l);
-}
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const T = {
   bg1:   "#0e0d0a",
@@ -24,35 +18,84 @@ const T = {
   DM:    "'DM Sans', sans-serif",
 };
 
-const mockUsers = [
-  { id:"001", status:"ativo"  },
-  { id:"002", status:"ativo"  },
-  { id:"003", status:"banido" },
-  { id:"004", status:"ativo"  },
-  { id:"005", status:"ativo"  },
-];
+const statusColor = (s: string) => s === "confirmado" ? T.green : s === "cancelado" ? T.red : T.gold;
 
-const mockAgendamentos = [
-  { id:"A001", cliente:"Carlos Mendes",  servico:"Corte e Barba",      data:"25/02/2025", hora:"09:00", valor:"R$35", status:"confirmado" },
-  { id:"A002", cliente:"Rafael Lima",    servico:"Corte",               data:"25/02/2025", hora:"09:45", valor:"R$20", status:"confirmado" },
-  { id:"A003", cliente:"Gustavo Rocha",  servico:"Luzes e Corte",       data:"25/02/2025", hora:"10:30", valor:"R$60", status:"pendente"   },
-  { id:"A004", cliente:"Lucas Ferreira", servico:"Corte e Sobrancelha", data:"26/02/2025", hora:"09:00", valor:"R$25", status:"confirmado" },
-  { id:"A005", cliente:"Carlos Mendes",  servico:"Barba",               data:"26/02/2025", hora:"10:30", valor:"R$20", status:"cancelado"  },
-];
-
-const statusColor = (s) => s === "confirmado" ? T.green : s === "cancelado" ? T.red : T.gold;
+interface AgendaItem {
+  hora: string;
+  cliente: string;
+  servico: string;
+  valor: string;
+  status: string;
+}
 
 export default function TabDashboard() {
-  const banidos        = mockUsers.filter(u => u.status === "banido").length;
-  const ativos         = mockUsers.length - banidos;
-  const hoje           = mockAgendamentos.filter(a => a.data === "25/02/2025");
-  const faturamentoDia = hoje.reduce((s, a) => s + parseInt(a.valor.replace("R$", "")), 0);
+  const [ativos, setAtivos] = useState(0);
+  const [banidos, setBanidos] = useState(0);
+  const [agendaHoje, setAgendaHoje] = useState<AgendaItem[]>([]);
+  const [faturamento, setFaturamento] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Count profiles (all are "ativo" since we don't have a ban field yet)
+        const { count: totalProfiles } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+        setAtivos(totalProfiles || 0);
+        setBanidos(0);
+
+        // Today's appointments
+        const today = new Date().toISOString().split("T")[0];
+        const { data: appts } = await supabase
+          .from("appointments")
+          .select("appointment_time, status, combo, service_id, user_id")
+          .eq("appointment_date", today);
+
+        if (appts && appts.length > 0) {
+          // Get service details
+          const serviceIds = [...new Set(appts.map(a => a.service_id))];
+          const { data: services } = await supabase.from("services").select("id, name, price").in("id", serviceIds);
+          const serviceMap = new Map((services || []).map(s => [s.id, s]));
+
+          // Get user names
+          const userIds = [...new Set(appts.map(a => a.user_id))];
+          const { data: profiles } = await supabase.from("profiles").select("user_id, name").in("user_id", userIds);
+          const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+
+          const items: AgendaItem[] = appts.map(a => {
+            const svc = serviceMap.get(a.service_id);
+            return {
+              hora: a.appointment_time,
+              cliente: profileMap.get(a.user_id) || "Cliente",
+              servico: svc?.name || "Serviço",
+              valor: `R$${Number(svc?.price || 0).toFixed(0)}`,
+              status: a.status,
+            };
+          }).sort((a, b) => a.hora.localeCompare(b.hora));
+
+          setAgendaHoje(items);
+
+          const fat = appts
+            .filter(a => a.status === "confirmado")
+            .reduce((sum, a) => sum + Number(serviceMap.get(a.service_id)?.price || 0), 0);
+          setFaturamento(fat);
+        } else {
+          setAgendaHoje([]);
+          setFaturamento(0);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dashboard:", err);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   const stats = [
-    { label:"Clientes Ativos",   value: ativos,              icon:"👤", color: T.green  },
-    { label:"Contas Banidas",    value: banidos,              icon:"🚫", color: T.red    },
-    { label:"Agenda Hoje",       value: hoje.length,          icon:"📅", color: T.gold   },
-    { label:"Faturamento / Dia", value:`R$${faturamentoDia}`, icon:"💰", color: T.goldL  },
+    { label:"Clientes Ativos",   value: ativos,               icon:"👤", color: T.green  },
+    { label:"Contas Banidas",    value: banidos,               icon:"🚫", color: T.red    },
+    { label:"Agenda Hoje",       value: agendaHoje.length,     icon:"📅", color: T.gold   },
+    { label:"Faturamento / Dia", value:`R$${faturamento}`,     icon:"💰", color: T.goldL  },
   ];
 
   return (
@@ -68,39 +111,47 @@ export default function TabDashboard() {
 
       <div style={{ padding:"24px 24px 40px" }}>
 
-        {/* Cards métricas */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:28 }}>
-          {stats.map(s => (
-            <div key={s.label} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 14px", position:"relative", overflow:"hidden" }}>
-              <div style={{ position:"absolute", top:-10, right:-10, width:52, height:52, borderRadius:"50%", background:`${s.color}14`, pointerEvents:"none" }} />
-              <div style={{ fontSize:20, marginBottom:8 }}>{s.icon}</div>
-              <div style={{ fontSize:24, fontWeight:800, color:s.color, lineHeight:1, marginBottom:4 }}>{s.value}</div>
-              <div style={{ fontSize:10, color:T.textD, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600 }}>{s.label}</div>
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"40px 0", color:T.textD, fontSize:12 }}>Carregando...</div>
+        ) : (
+          <>
+            {/* Cards métricas */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:28 }}>
+              {stats.map(s => (
+                <div key={s.label} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 14px", position:"relative", overflow:"hidden" }}>
+                  <div style={{ position:"absolute", top:-10, right:-10, width:52, height:52, borderRadius:"50%", background:`${s.color}14`, pointerEvents:"none" }} />
+                  <div style={{ fontSize:20, marginBottom:8 }}>{s.icon}</div>
+                  <div style={{ fontSize:24, fontWeight:800, color:s.color, lineHeight:1, marginBottom:4 }}>{s.value}</div>
+                  <div style={{ fontSize:10, color:T.textD, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600 }}>{s.label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Agenda de hoje */}
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-          <span style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:T.gold }}>📋 Agenda de hoje</span>
-          <div style={{ flex:1, height:1, background:`linear-gradient(to right,${T.goldD},transparent)` }} />
-        </div>
-
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {hoje.map(a => (
-            <div key={a.id} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:T.textM, width:38, flexShrink:0 }}>{a.hora}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.cliente}</div>
-                <div style={{ fontSize:11, color:T.textD, marginTop:1 }}>{a.servico}</div>
-              </div>
-              <div style={{ textAlign:"right", flexShrink:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:T.goldL }}>{a.valor}</div>
-                <div style={{ fontSize:10, color:statusColor(a.status), fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", marginTop:1 }}>{a.status}</div>
-              </div>
+            {/* Agenda de hoje */}
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+              <span style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:T.gold }}>📋 Agenda de hoje</span>
+              <div style={{ flex:1, height:1, background:`linear-gradient(to right,${T.goldD},transparent)` }} />
             </div>
-          ))}
-        </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {agendaHoje.length === 0 ? (
+                <div style={{ textAlign:"center", padding:"30px 0", color:T.textD, fontSize:12 }}>Nenhum agendamento hoje</div>
+              ) : agendaHoje.map((a, i) => (
+                <div key={i} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:T.textM, width:38, flexShrink:0 }}>{a.hora}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.cliente}</div>
+                    <div style={{ fontSize:11, color:T.textD, marginTop:1 }}>{a.servico}</div>
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:T.goldL }}>{a.valor}</div>
+                    <div style={{ fontSize:10, color:statusColor(a.status), fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em", marginTop:1 }}>{a.status}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
       </div>
     </div>
