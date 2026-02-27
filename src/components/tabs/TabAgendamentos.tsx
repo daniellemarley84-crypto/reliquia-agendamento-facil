@@ -50,7 +50,7 @@ export default function TabAgendamentos() {
         const userIds = [...new Set(appts.map(a => a.user_id))];
         
         const { data: services } = await supabase.from("services").select("id, name, price").in("id", serviceIds);
-        const { data: profiles } = await supabase.from("profiles").select("user_id, name").in("user_id", userIds);
+        const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", userIds);
         
         const serviceMap = new Map((services || []).map(s => [s.id, s]));
         const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
