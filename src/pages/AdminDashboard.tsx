@@ -18,7 +18,7 @@ const AdminDashboard = () => {
     const checkAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/login"); return; }
-      const { data: profile } = await supabase.from("profiles").select("is_admin").eq("user_id", session.user.id).single();
+      const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", session.user.id).single();
       if (!profile?.is_admin) { navigate("/dashboard"); return; }
       setLoading(false);
     };
