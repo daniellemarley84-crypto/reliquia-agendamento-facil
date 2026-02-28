@@ -24,17 +24,19 @@ const Login = () => {
       toast.error("Erro ao entrar: " + error.message);
     } else {
       // Check if user is admin
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("user_id", data.user.id)
-        .single();
-      
-      if (profile?.is_admin) {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
+     const { data: profile, error: profileError } = await supabase
+  .from("profiles")
+  .select("is_admin")
+  .eq("user_id", data.user.id)
+  .maybeSingle();
+
+console.log("Profile:", profile, "Error:", profileError, "UserID:", data.user.id);
+
+if (profile?.is_admin) {
+  navigate("/admin");
+} else {
+  navigate("/dashboard");
+}
     }
   };
 
