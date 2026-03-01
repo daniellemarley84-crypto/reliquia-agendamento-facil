@@ -29,6 +29,8 @@ export function PerfilTab({ userId }: { userId: string }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -41,12 +43,40 @@ export function PerfilTab({ userId }: { userId: string }) {
   }, [userId]);
 
   const loadData = async () => {
+    setInitialLoading(true);
+    setLoadError(null);
+
     const [profileRes, apptRes] = await Promise.all([
-      supabase.from("profiles").select("name, phone, birth_date").eq("user_id", userId).single(),
-      supabase.from("appointments").select("id, appointment_date, appointment_time, status, services(name)").eq("user_id", userId).order("appointment_date", { ascending: false }),
+      supabase
+        .from("profiles")
+        .select("name, phone, birth_date")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("appointments")
+        .select("id, appointment_date, appointment_time, status, services(name)")
+        .eq("user_id", userId)
+        .order("appointment_date", { ascending: false }),
     ]);
-    if (profileRes.data) setProfile(profileRes.data);
-    if (apptRes.data) setAppointments(apptRes.data as unknown as Appointment[]);
+
+    if (profileRes.error || apptRes.error) {
+      setLoadError(
+        profileRes.error?.message ||
+          apptRes.error?.message ||
+          "Não foi possível carregar seus dados."
+      );
+    }
+
+    setProfile(
+      profileRes.data ?? {
+        name: "Não informado",
+        phone: null,
+        birth_date: null,
+      }
+    );
+
+    setAppointments((apptRes.data as unknown as Appointment[]) ?? []);
+    setInitialLoading(false);
   };
 
   const handleCancelAppointment = async (id: string) => {
@@ -80,7 +110,8 @@ export function PerfilTab({ userId }: { userId: string }) {
     return "text-muted-foreground";
   };
 
-  if (!profile) return <div className="text-muted-foreground">Carregando...</div>;
+  if (initialLoading) return <div className="text-muted-foreground">Carregando...</div>;
+  if (!profile) return <div className="text-muted-foreground">Não foi possível carregar o perfil.</div>;
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -114,6 +145,10 @@ export function PerfilTab({ userId }: { userId: string }) {
           </Button>
         </div>
       </div>
+
+      {loadError && (
+        <div className="text-sm text-destructive">{loadError}</div>
+      )}
 
       {/* Password Modal */}
       {showPasswordModal && (
