@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Lock, Phone, CalendarDays, Hash, XCircle } from "lucide-react";
+import { User, Lock, Phone, CalendarDays, Hash, XCircle, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface Profile {
   name: string;
@@ -28,6 +29,12 @@ export function PerfilTab({ userId }: { userId: string }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
 
   useEffect(() => {
     loadData();
@@ -98,9 +105,12 @@ export function PerfilTab({ userId }: { userId: string }) {
             <div><p className="text-xs text-muted-foreground">ID</p><p className="font-medium text-xs break-all">{userId}</p></div>
           </div>
         </div>
-        <div className="flex justify-center pt-2">
+        <div className="flex justify-center gap-3 pt-2">
           <Button variant="outline" size="sm" onClick={() => setShowPasswordModal(true)} className="gap-2">
             <Lock className="w-4 h-4" /> Trocar Senha
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleLogout} className="gap-2">
+            <LogOut className="w-4 h-4" /> Sair
           </Button>
         </div>
       </div>
