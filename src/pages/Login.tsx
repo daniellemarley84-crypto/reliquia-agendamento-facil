@@ -20,24 +20,23 @@ const Login = () => {
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
+
     if (error) {
       toast.error("Erro ao entrar: " + error.message);
-    } else {
-      // Check if user is admin
-     const { data: profile, error: profileError } = await supabase
-  .from("profiles")
-  .select("is_admin")
-  .eq("user_id", data.user.id)
-  .maybeSingle();
-
-console.log("Profile:", profile, "Error:", profileError, "UserID:", data.user.id);
-
-if (profile?.is_admin) {
-  navigate("/admin");
-} else {
-  navigate("/dashboard");
-}
+      return;
     }
+
+    const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin", {
+      _user_id: data.user.id,
+    });
+
+    if (adminError) {
+      toast.error("Erro ao validar acesso admin: " + adminError.message);
+      navigate("/dashboard");
+      return;
+    }
+
+    navigate(isAdmin ? "/admin" : "/dashboard");
   };
 
   const handleEmailChange = (value: string) => {

@@ -15,14 +15,49 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
+    let mounted = true;
+
     const checkAdmin = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/login"); return; }
-      const { data: profile } = await supabase.from("profiles").select("is_admin").eq("user_id", session.user.id).maybeSingle();
-      if (!profile?.is_admin) { navigate("/dashboard"); return; }
+      setLoading(true);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (sessionError || !session) {
+        navigate("/login");
+        return;
+      }
+
+      const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin", {
+        _user_id: session.user.id,
+      });
+
+      if (!mounted) return;
+
+      if (adminError || !isAdmin) {
+        navigate("/dashboard");
+        return;
+      }
+
       setLoading(false);
     };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) navigate("/login");
+    });
+
     checkAdmin();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleLogout = async () => {
