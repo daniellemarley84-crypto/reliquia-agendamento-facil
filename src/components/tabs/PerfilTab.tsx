@@ -119,12 +119,12 @@ export function PerfilTab({ userId }: { userId: string }) {
     setLoading(true);
     const { error } = await supabase
       .from("profiles")
-      .update({
+      .upsert({
+        user_id: userId,
         name: editName,
         phone: editPhone || null,
         birth_date: editBirthDate || null,
-      })
-      .eq("user_id", userId);
+      }, { onConflict: "user_id" });
     setLoading(false);
     if (error) {
       toast.error("Erro ao salvar: " + error.message);
@@ -134,7 +134,7 @@ export function PerfilTab({ userId }: { userId: string }) {
       setShowEditModal(false);
     }
   };
-
+  
   const statusColor = (s: string) => {
     if (s === "confirmado") return "text-green-400";
     if (s === "cancelado") return "text-destructive";
