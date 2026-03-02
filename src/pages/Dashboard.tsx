@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import TabAgendar from "@/components/tabs/TabAgendar";
 import TabInicio from "@/components/tabs/TabInicio";
 import { LocalizacaoTab } from "@/components/tabs/LocalizacaoTab";
 import { SuporteTab } from "@/components/tabs/SuporteTab";
 import { PagarTab } from "@/components/tabs/PagarTab";
 import { PerfilTab } from "@/components/tabs/PerfilTab";
-import { User, MapPin, Home, CalendarDays, CreditCard, LogOut } from "lucide-react";
+import { User, MapPin, Home, CalendarDays, CreditCard, Menu } from "lucide-react";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
 const HOTBAR_ITEMS = [
@@ -18,34 +20,28 @@ const HOTBAR_ITEMS = [
   { id: "pagar", label: "Pagar", icon: CreditCard },
 ];
 
-const Dashboard = () => {
-  const [user, setUser] = useState<SupaUser | null>(null);
-  const [activeTab, setActiveTab] = useState("inicio");
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) navigate("/login");
-      else setUser(session.user);
-    });
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate("/login");
-      else setUser(session.user);
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
-  };
-
-  if (!user) return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0d0d0d", color: "#d4af37", fontSize: 18 }}>
-      Carregando...
-    </div>
+function SidebarToggle() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <button
+      onClick={toggleSidebar}
+      style={{
+        position: "fixed", top: 12, left: 12, zIndex: 1000,
+        width: 36, height: 36, borderRadius: 8,
+        background: "rgba(13,13,13,0.7)", backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", transition: "all 0.2s",
+      }}
+    >
+      <Menu size={18} color="rgba(255,255,255,0.5)" />
+    </button>
   );
+}
 
+function DashboardContent({ user, activeTab, setActiveTab, handleLogout }: {
+  user: SupaUser; activeTab: string; setActiveTab: (t: string) => void; handleLogout: () => void;
+}) {
   const renderTab = () => {
     switch (activeTab) {
       case "inicio": return <TabInicio onNavigate={(tab: string) => setActiveTab(tab === "agendar" ? "agendamentos" : tab)} />;
@@ -59,9 +55,10 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background" style={{ paddingBottom: 80 }}>
-      {/* Main content */}
-      <main style={{ width: "100%" }}>
+    <div className="min-h-screen bg-background flex w-full" style={{ paddingBottom: 80 }}>
+      <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
+      <main style={{ width: "100%", flex: 1 }}>
+        <SidebarToggle />
         {renderTab()}
       </main>
 
@@ -110,6 +107,41 @@ const Dashboard = () => {
         })}
       </div>
     </div>
+  );
+}
+
+const Dashboard = () => {
+  const [user, setUser] = useState<SupaUser | null>(null);
+  const [activeTab, setActiveTab] = useState("inicio");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) navigate("/login");
+      else setUser(session.user);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) navigate("/login");
+      else setUser(session.user);
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  if (!user) return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0d0d0d", color: "#d4af37", fontSize: 18 }}>
+      Carregando...
+    </div>
+  );
+
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <DashboardContent user={user} activeTab={activeTab} setActiveTab={setActiveTab} handleLogout={handleLogout} />
+    </SidebarProvider>
   );
 };
 export default Dashboard;
