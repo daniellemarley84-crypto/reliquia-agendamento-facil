@@ -55,6 +55,33 @@ export type Database = {
           },
         ]
       }
+      carousel_slides: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          position: number
+          subtitle: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          position?: number
+          subtitle?: string
+          title?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          position?: number
+          subtitle?: string
+          title?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           birth_date: string | null
