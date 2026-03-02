@@ -52,7 +52,13 @@ const Signup = () => {
 
     if (error) {
       setLoading(false);
-      toast.error("Erro ao cadastrar: " + error.message);
+      if (error.message.includes("database error")) {
+        toast.error("Falha ao cadastrar. Por favor, tente novamente.");
+      } else if (error.message.includes("already registered")) {
+        toast.error("Este email já está cadastrado. Tente fazer login.");
+      } else {
+        toast.error("Erro ao cadastrar: " + error.message);
+      }
       return;
     }
 

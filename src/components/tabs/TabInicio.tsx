@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 if (!document.querySelector('link[href*="DM+Sans"]')) {
   const l = document.createElement("link");
@@ -7,11 +8,10 @@ if (!document.querySelector('link[href*="DM+Sans"]')) {
   document.head.appendChild(l);
 }
 
-// ─── Dados ───────────────────────────────────────────────────────────────────
-const SLIDES = [
-  { id: 1, src: "/photos/foto1.jpg", alt: "Foto 1" },
-  { id: 2, src: "/photos/foto2.jpg", alt: "Foto 2" },
-  { id: 3, src: "/photos/foto3.jpg", alt: "Foto 3" },
+const FALLBACK_SLIDES = [
+  { id: "1", src: "/photos/foto1.jpg", alt: "Foto 1" },
+  { id: "2", src: "/photos/foto2.jpg", alt: "Foto 2" },
+  { id: "3", src: "/photos/foto3.jpg", alt: "Foto 3" },
 ];
 
 const C = {
@@ -29,28 +29,36 @@ const C = {
   DM:    "'DM Sans', sans-serif",
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-//  CONTEÚDO DA ABA INÍCIO (sem header, sem nav)
-// ════════════════════════════════════════════════════════════════════════════
-export default function TabInicio({ onNavigate }) {
+export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const [slides, setSlides] = useState(FALLBACK_SLIDES);
   const [current, setCurrent] = useState(0);
-  const [drag,    setDrag]    = useState(false);
-  const [hover,   setHover]   = useState(false);
+  const [hover, setHover] = useState(false);
   const startX = useRef(0);
-  const timer  = useRef(null);
-  const total  = SLIDES.length;
+  const dragging = useRef(false);
+  const timer = useRef<any>(null);
+  const total = slides.length;
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from("carousel_slides").select("*").order("position");
+      if (data && data.length > 0) {
+        setSlides(data.map(s => ({ id: s.id, src: s.image_url, alt: s.title })));
+      }
+    };
+    load();
+  }, []);
 
   const next = () => setCurrent(c => (c + 1) % total);
   const prev = () => setCurrent(c => (c - 1 + total) % total);
   const resetTimer = () => { clearInterval(timer.current); timer.current = setInterval(next, 2000); };
-  useEffect(() => { resetTimer(); return () => clearInterval(timer.current); }, []);
+  useEffect(() => { resetTimer(); return () => clearInterval(timer.current); }, [total]);
 
-  const onDown = e => { startX.current = e.clientX ?? e.touches?.[0]?.clientX; setDrag(true); };
-  const onUp   = e => {
-    if (!drag) return;
+  const onDown = (e: any) => { startX.current = e.clientX ?? e.touches?.[0]?.clientX; dragging.current = true; };
+  const onUp = (e: any) => {
+    if (!dragging.current) return;
     const dx = startX.current - (e.clientX ?? e.changedTouches?.[0]?.clientX);
     if (Math.abs(dx) > 40) { dx > 0 ? next() : prev(); resetTimer(); }
-    setDrag(false);
+    dragging.current = false;
   };
 
   return (
@@ -59,7 +67,6 @@ export default function TabInicio({ onNavigate }) {
       padding: "28px 0 32px", gap: 20,
       background: C.black, minHeight: "100%", fontFamily: C.DM
     }}>
-      {/* Logo / Título */}
       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:"100%", padding: "0 16px" }}>
         <div style={{ width:48, height:1, background:C.white }} />
         <h1 style={{
@@ -75,7 +82,6 @@ export default function TabInicio({ onNavigate }) {
         <div style={{ width:48, height:1, background:C.white }} />
       </div>
 
-      {/* Carrossel */}
       <div
         style={{
           position: "relative", width: "100%",
@@ -91,7 +97,7 @@ export default function TabInicio({ onNavigate }) {
           transition: "transform 0.55s cubic-bezier(0.65,0,0.35,1)",
           transform: `translateX(-${current * 100}%)`
         }}>
-          {SLIDES.map(s => (
+          {slides.map(s => (
             <div key={s.id} style={{
               minWidth: "100%", height: "100%", position: "relative",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -109,7 +115,6 @@ export default function TabInicio({ onNavigate }) {
           ))}
         </div>
 
-        {/* Setas */}
         {([["‹", { left: 10 } as React.CSSProperties, prev], ["›", { right: 10 } as React.CSSProperties, next]] as [string, React.CSSProperties, () => void][]).map(([ch, pos, fn]) => (
           <button key={ch} style={{
             position: "absolute", top: "50%", transform: "translateY(-50%)", ...pos,
@@ -124,9 +129,8 @@ export default function TabInicio({ onNavigate }) {
         ))}
       </div>
 
-      {/* Dots */}
       <div style={{ display:"flex", gap:8 }}>
-        {SLIDES.map((_, i) => (
+        {slides.map((_, i) => (
           <button key={i} style={{
             width: 7, height: 7, borderRadius: "50%", border: "none", padding: 0,
             cursor: "pointer", transition: "all 0.3s",
@@ -138,7 +142,6 @@ export default function TabInicio({ onNavigate }) {
         ))}
       </div>
 
-      {/* Botão Agendar */}
       <button
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
