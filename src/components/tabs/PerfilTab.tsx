@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Lock, Phone, CalendarDays, Hash, XCircle, LogOut } from "lucide-react";
+import { User, Lock, Phone, CalendarDays, Hash, XCircle, LogOut, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Profile {
@@ -26,8 +26,12 @@ export function PerfilTab({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -104,6 +108,33 @@ export function PerfilTab({ userId }: { userId: string }) {
     }
   };
 
+  const openEditModal = () => {
+    setEditName(profile?.name || "");
+    setEditPhone(profile?.phone || "");
+    setEditBirthDate(profile?.birth_date || "");
+    setShowEditModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    setLoading(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        name: editName,
+        phone: editPhone || null,
+        birth_date: editBirthDate || null,
+      })
+      .eq("user_id", userId);
+    setLoading(false);
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+    } else {
+      toast.success("Perfil atualizado!");
+      setProfile({ name: editName, phone: editPhone || null, birth_date: editBirthDate || null });
+      setShowEditModal(false);
+    }
+  };
+
   const statusColor = (s: string) => {
     if (s === "confirmado") return "text-green-400";
     if (s === "cancelado") return "text-destructive";
@@ -136,7 +167,10 @@ export function PerfilTab({ userId }: { userId: string }) {
             <div><p className="text-xs text-muted-foreground">ID</p><p className="font-medium text-xs break-all">{userId}</p></div>
           </div>
         </div>
-        <div className="flex justify-center gap-3 pt-2">
+        <div className="flex justify-center gap-3 pt-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={openEditModal} className="gap-2">
+            <Pencil className="w-4 h-4" /> Editar Perfil
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowPasswordModal(true)} className="gap-2">
             <Lock className="w-4 h-4" /> Trocar Senha
           </Button>
@@ -148,6 +182,31 @@ export function PerfilTab({ userId }: { userId: string }) {
 
       {loadError && (
         <div className="text-sm text-destructive">{loadError}</div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,.75)", backdropFilter: "blur(4px)", animation: "fadeIn .3s" }}>
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-sm space-y-4 mx-4" style={{ animation: "slideUp .4s cubic-bezier(.16,1,.3,1)" }}>
+            <h3 className="text-lg font-semibold flex items-center gap-2"><Pencil className="w-4 h-4" /> Editar Perfil</h3>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><User className="w-3 h-3" /> Nome</p>
+              <Input placeholder="Seu nome" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> Telefone</p>
+              <Input placeholder="(00) 00000-0000" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Nascimento</p>
+              <Input type="date" value={editBirthDate} onChange={(e) => setEditBirthDate(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSaveProfile} disabled={loading} className="flex-1">{loading ? "Salvando..." : "Salvar"}</Button>
+              <Button variant="outline" onClick={() => setShowEditModal(false)} className="flex-1">Cancelar</Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Password Modal */}
