@@ -119,12 +119,12 @@ export function PerfilTab({ userId }: { userId: string }) {
     setLoading(true);
     const { error } = await supabase
       .from("profiles")
-      .upsert({
-        user_id: userId,
+      .update({
         name: editName,
         phone: editPhone || null,
         birth_date: editBirthDate || null,
-      }, { onConflict: "user_id" });
+      })
+      .eq("user_id", userId);
     setLoading(false);
     if (error) {
       toast.error("Erro ao salvar: " + error.message);
