@@ -56,17 +56,20 @@ export function PagarTab({ userId }: { userId: string }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from("appointments")
-      .select("id, appointment_date, appointment_time, services(name, price)")
-      .eq("user_id", userId)
-      .eq("status", "confirmado")
-      .then(({ data }) => {
-        if (data) setAppointments(data as unknown as Appointment[]);
-      });
-  }, [userId]);
+ useEffect(() => {
+  const today = new Date().toISOString().split("T")[0]; // formato YYYY-MM-DD
 
+  supabase
+    .from("appointments")
+    .select("id, appointment_date, appointment_time, services(name, price)")
+    .eq("user_id", userId)
+    .eq("status", "confirmado")
+    .eq("appointment_date", today) // 👈 filtra só o dia de hoje
+    .then(({ data }) => {
+      if (data) setAppointments(data as unknown as Appointment[]);
+    });
+}, [userId]);
+  
   const total = appointments.reduce((sum, a) => sum + (a.services?.price || 0), 0);
   const pixPayload = total > 0 ? generatePixPayload("+5585997410934", "Harley Deyson Girao", "Caucaia", total) : "";
 
