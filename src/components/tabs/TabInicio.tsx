@@ -15,18 +15,10 @@ const FALLBACK_SLIDES = [
 ];
 
 const C = {
-  bg:    "#0d0c0a",
-  bg2:   "#141210",
-  bg3:   "#1c1a16",
-  bg4:   "#242018",
-  gold:  "#c9a84c",
-  goldL: "#f0d080",
-  goldD: "#7a5f25",
-  text:  "#e8dfc8",
-  textD: "#8a7f6a",
-  white: "#ffffff",
-  black: "#000000",
-  DM:    "'DM Sans', sans-serif",
+  bg: "#0d0c0a", bg2: "#141210", bg3: "#1c1a16", bg4: "#242018",
+  gold: "#c9a84c", goldL: "#f0d080", goldD: "#7a5f25",
+  text: "#e8dfc8", textD: "#8a7f6a", white: "#ffffff", black: "#000000",
+  DM: "'DM Sans', sans-serif",
 };
 
 export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) => void }) {
@@ -40,9 +32,13 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from("carousel_slides").select("*").order("position");
+      const { data } = await supabase
+        .from("carousel_slides")
+        .select("*")
+        .eq("active", true)
+        .order("order_index");
       if (data && data.length > 0) {
-        setSlides(data.map(s => ({ id: s.id, src: s.image_url, alt: s.title })));
+        setSlides(data.map(s => ({ id: s.id, src: s.image_url, alt: s.title || "" })));
       }
     };
     load();
@@ -67,19 +63,19 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
       padding: "28px 0 32px", gap: 20,
       background: C.black, minHeight: "100%", fontFamily: C.DM
     }}>
-      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:"100%", padding: "0 16px" }}>
-        <div style={{ width:48, height:1, background:C.white }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%", padding: "0 16px" }}>
+        <div style={{ width: 48, height: 1, background: C.white }} />
         <h1 style={{
           fontFamily: C.DM, color: C.white, fontSize: 12, fontWeight: 400,
           letterSpacing: "0.22em", textTransform: "uppercase",
           textAlign: "center", margin: 0, lineHeight: 1.8
         }}>
-          BEM-VINDO A<br/>
-          <span style={{ fontFamily:C.DM, fontSize:22, fontWeight:800, letterSpacing:"0.08em" }}>
+          BEM-VINDO A<br />
+          <span style={{ fontFamily: C.DM, fontSize: 22, fontWeight: 800, letterSpacing: "0.08em" }}>
             RELÍQUIA BARBER
           </span>
         </h1>
-        <div style={{ width:48, height:1, background:C.white }} />
+        <div style={{ width: 48, height: 1, background: C.white }} />
       </div>
 
       <div
@@ -105,7 +101,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
             }}>
               <img
                 src={s.src} alt={s.alt} draggable={false}
-                style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                 onError={e => {
                   (e.currentTarget as HTMLImageElement).style.display = "none";
                   (e.currentTarget.parentElement as HTMLElement).style.background = "#1a1a1a";
@@ -129,7 +125,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
         ))}
       </div>
 
-      <div style={{ display:"flex", gap:8 }}>
+      <div style={{ display: "flex", gap: 8 }}>
         {slides.map((_, i) => (
           <button key={i} style={{
             width: 7, height: 7, borderRadius: "50%", border: "none", padding: 0,
@@ -158,7 +154,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
         onMouseLeave={() => setHover(false)}
         onClick={() => onNavigate("agendar")}
       >
-        <span style={{ fontSize:15 }}>✂</span> AGENDAR AGORA
+        <span style={{ fontSize: 15 }}>✂</span> AGENDAR AGORA
       </button>
     </div>
   );

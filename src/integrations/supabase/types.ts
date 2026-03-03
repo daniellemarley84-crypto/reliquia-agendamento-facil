@@ -57,25 +57,31 @@ export type Database = {
       }
       carousel_slides: {
         Row: {
+          active: boolean
           created_at: string
           id: string
           image_url: string
+          order_index: number
           position: number
           subtitle: string
           title: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
           id?: string
           image_url: string
+          order_index?: number
           position?: number
           subtitle?: string
           title?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
           id?: string
           image_url?: string
+          order_index?: number
           position?: number
           subtitle?: string
           title?: string
