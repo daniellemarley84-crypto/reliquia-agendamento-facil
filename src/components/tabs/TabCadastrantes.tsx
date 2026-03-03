@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const T = {
   bg1:   "#0e0d0a",
@@ -26,6 +27,7 @@ interface UserProfile {
   phone: string;
   dataCadastro: string;
   status: string;
+  banned: boolean;
 }
 
 export default function TabCadastrantes() {
@@ -34,36 +36,51 @@ export default function TabCadastrantes() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      try {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, user_id, name, phone, created_at, is_admin")
-          .eq("is_admin", false)
-          .order("created_at", { ascending: false });
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, user_id, name, phone, created_at, is_admin, banned")
+        .eq("is_admin", false)
+        .order("created_at", { ascending: false });
 
-        if (profiles) {
-          setUsers(profiles.map(p => {
-            const d = new Date(p.created_at);
-            return {
-              id: p.id,
-              user_id: p.user_id,
-              nome: p.name || "Sem nome",
-              phone: p.phone || "—",
-              dataCadastro: d.toLocaleDateString("pt-BR"),
-              status: "ativo",
-            };
-          }));
-        }
-      } catch (err) {
-        console.error("Erro ao carregar cadastrantes:", err);
+      if (profiles) {
+        setUsers(profiles.map((p: any) => {
+          const d = new Date(p.created_at);
+          return {
+            id: p.id,
+            user_id: p.user_id,
+            nome: p.name || "Sem nome",
+            phone: p.phone || "—",
+            dataCadastro: d.toLocaleDateString("pt-BR"),
+            status: p.banned ? "banido" : "ativo",
+            banned: p.banned ?? false,
+          };
+        }));
       }
-      setLoading(false);
-    };
-    fetchUsers();
-  }, []);
+    } catch (err) {
+      console.error("Erro ao carregar cadastrantes:", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const toggleBan = async (user: UserProfile) => {
+    const newBanned = !user.banned;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ banned: newBanned })
+      .eq("id", user.id);
+
+    if (error) {
+      toast.error("Erro ao atualizar status: " + error.message);
+      return;
+    }
+    toast.success(newBanned ? `${user.nome} foi banido` : `${user.nome} foi desbanido`);
+    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, banned: newBanned, status: newBanned ? "banido" : "ativo" } : u));
+  };
 
   const filtered = users.filter(u =>
     u.nome.toLowerCase().includes(search.toLowerCase()) || u.id.includes(search)
@@ -125,18 +142,18 @@ export default function TabCadastrantes() {
               >
                 <div style={{
                   width:36, height:36, borderRadius:"50%",
-                  background: "linear-gradient(135deg,#2a1a08,#3d2810)",
-                  border: `1px solid #5a3a18`,
+                  background: user.banned ? "linear-gradient(135deg,#2a0808,#3d1010)" : "linear-gradient(135deg,#2a1a08,#3d2810)",
+                  border: `1px solid ${user.banned ? "#5a1818" : "#5a3a18"}`,
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:13, fontWeight:700, color: T.gold, flexShrink:0,
+                  fontSize:13, fontWeight:700, color: user.banned ? T.red : T.gold, flexShrink:0,
                 }}>{initials}</div>
 
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color: T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user.nome}</div>
+                  <div style={{ fontSize:13, fontWeight:600, color: user.banned ? T.textM : T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", textDecoration: user.banned ? "line-through" : "none" }}>{user.nome}</div>
                   <div style={{ fontSize:10, color:T.textD, letterSpacing:"0.08em", marginTop:2 }}>ID #{user.id.slice(0, 8)}</div>
                 </div>
 
-                <div style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, background: T.green, boxShadow:`0 0 5px ${T.green}80` }} />
+                <div style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, background: user.banned ? T.red : T.green, boxShadow:`0 0 5px ${user.banned ? T.red : T.green}80` }} />
 
                 <button
                   style={{ fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase", background:"#1e1a14", border:`1px solid #3a2a14`, color:"#9a7a40", padding:"4px 10px", borderRadius:4, cursor:"pointer", flexShrink:0, fontFamily:T.DM, fontWeight:500 }}
@@ -158,7 +175,32 @@ export default function TabCadastrantes() {
                   ))}
                   <div style={{ display:"flex", gap:8, fontSize:12 }}>
                     <span style={{ fontSize:10, fontWeight:700, color:T.textD, letterSpacing:"0.06em", textTransform:"uppercase", width:72, flexShrink:0, paddingTop:1 }}>Status</span>
-                    <span style={{ color: T.green, fontWeight:600 }}>● Ativo</span>
+                    <span style={{ color: user.banned ? T.red : T.green, fontWeight:600 }}>
+                      {user.banned ? "● Banido" : "● Ativo"}
+                    </span>
+                  </div>
+
+                  {/* Ban/Unban button */}
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      onClick={() => toggleBan(user)}
+                      style={{
+                        fontSize: 11,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        fontFamily: T.DM,
+                        background: user.banned ? "#1a2a1a" : T.redD,
+                        border: `1px solid ${user.banned ? "#2a4a2a" : "#6a2020"}`,
+                        color: user.banned ? T.green : T.red,
+                        padding: "8px 16px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        width: "100%",
+                      }}
+                    >
+                      {user.banned ? "🔓 Desbanir Usuário" : "🚫 Banir Usuário"}
+                    </button>
                   </div>
                 </div>
               )}
