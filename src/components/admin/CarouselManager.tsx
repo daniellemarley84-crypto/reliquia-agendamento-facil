@@ -1,57 +1,58 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-const FONT = "'DM Sans', sans-serif";
-const RED = "#e63946";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Trash2, ArrowUp, ArrowDown, Plus, Upload, Scissors, Save, Image, FolderOpen } from "lucide-react";
 
 // ════════════════════════════════════════════════════════════════════════════
-//  1. CropModal
+//  Types
 // ════════════════════════════════════════════════════════════════════════════
-const AR: Record<string, number | null> = { "free": null, "16:9": 16/9, "4:3": 4/3, "1:1": 1, "3:1": 3, "2.4:1": 2.4 };
+interface SlideData {
+  id: string;
+  order_index: number;
+  image_url: string;
+  active: boolean;
+}
 
-export function CropModal({ src, onConfirm, onCancel }: { src: string; onConfirm: (url: string) => void; onCancel: () => void }) {
+interface StorageFile {
+  name: string;
+  url: string;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CropModal (simplified, robust)
+// ════════════════════════════════════════════════════════════════════════════
+function CropModal({ src, onConfirm, onCancel }: { src: string; onConfirm: (url: string) => void; onCancel: () => void }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cropRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const dragRef = useRef<any>(null);
-  const aspectRef = useRef("free");
   const [crop, setCropState] = useState({ x: 0, y: 0, w: 0, h: 0 });
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [aspect, setAspect] = useState("free");
 
-  const setCrop = (c: any) => { cropRef.current = c; setCropState(c); };
-  const changeAspect = (k: string) => { aspectRef.current = k; setAspect(k); };
-
-  const constrain = useCallback((c: any) => {
-    const ar = AR[aspectRef.current];
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return c;
-    const cw = rect.width, ch = rect.height;
-    let { x, y, w, h } = c;
-    if (ar) { h = w / ar; if (h > ch) { h = ch; w = h * ar; } }
-    w = Math.max(20, Math.min(w, cw));
-    h = Math.max(20, Math.min(h, ch));
-    x = Math.max(0, Math.min(x, cw - w));
-    y = Math.max(0, Math.min(y, ch - h));
-    return { x, y, w, h };
-  }, []);
+  const setCrop = (c: typeof crop) => { cropRef.current = c; setCropState(c); };
 
   useEffect(() => {
     if (!imgLoaded || !containerRef.current) return;
     const { width: cw, height: ch } = containerRef.current.getBoundingClientRect();
-    const ar = AR[aspect];
-    let w = cw * 0.8, h = ar ? w / ar : ch * 0.8;
-    if (ar && h > ch * 0.9) { h = ch * 0.9; w = h * ar; }
-    setCrop(constrain({ x: (cw - w) / 2, y: (ch - h) / 2, w, h }));
-  }, [imgLoaded, aspect, constrain]);
+    const w = cw * 0.8, h = ch * 0.8;
+    setCrop({ x: (cw - w) / 2, y: (ch - h) / 2, w, h });
+  }, [imgLoaded]);
 
-  // Touch support
+  const constrain = useCallback((c: typeof crop) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return c;
+    let { x, y, w, h } = c;
+    w = Math.max(20, Math.min(w, rect.width));
+    h = Math.max(20, Math.min(h, rect.height));
+    x = Math.max(0, Math.min(x, rect.width - w));
+    y = Math.max(0, Math.min(y, rect.height - h));
+    return { x, y, w, h };
+  }, []);
+
   const getPos = (e: any) => {
-    if (e.touches) {
-      const t = e.touches[0] || e.changedTouches[0];
-      return { clientX: t.clientX, clientY: t.clientY };
-    }
+    if (e.touches) { const t = e.touches[0] || e.changedTouches[0]; return { clientX: t.clientX, clientY: t.clientY }; }
     return { clientX: e.clientX, clientY: e.clientY };
   };
 
@@ -61,57 +62,31 @@ export function CropModal({ src, onConfirm, onCancel }: { src: string; onConfirm
     return { x: clientX - r.left, y: clientY - r.top };
   };
 
-  const HANDLE_HIT = 18;
-  const getHandle = (px: number, py: number) => {
-    const c = cropRef.current;
-    const pts: Record<string, [number, number]> = {
-      nw:[c.x,c.y], n:[c.x+c.w/2,c.y], ne:[c.x+c.w,c.y],
-      w:[c.x,c.y+c.h/2], e:[c.x+c.w,c.y+c.h/2],
-      sw:[c.x,c.y+c.h], s:[c.x+c.w/2,c.y+c.h], se:[c.x+c.w,c.y+c.h],
-    };
-    for (const [k,[hx,hy]] of Object.entries(pts)) {
-      if (Math.abs(px-hx) <= HANDLE_HIT && Math.abs(py-hy) <= HANDLE_HIT) return k;
-    }
-    return null;
-  };
-
-  const onPointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+  const onPointerDown = (e: any) => {
     if ('button' in e && e.button !== 0) return;
     e.preventDefault();
     const { x: px, y: py } = relPos(e);
-    const handle = getHandle(px, py);
     const sc = { ...cropRef.current };
-    if (handle) {
-      dragRef.current = { type: "resize", handle, startX: px, startY: py, startCrop: sc };
-    } else if (px>=sc.x && px<=sc.x+sc.w && py>=sc.y && py<=sc.y+sc.h) {
+    if (px >= sc.x && px <= sc.x + sc.w && py >= sc.y && py <= sc.y + sc.h) {
       dragRef.current = { type: "move", startX: px, startY: py, startCrop: sc };
     } else {
-      dragRef.current = { type: "create", startX: px, startY: py, startCrop: sc };
+      dragRef.current = { type: "create", startX: px, startY: py };
     }
   };
 
-  const onPointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const onPointerMove = useCallback((e: any) => {
     const d = dragRef.current;
     if (!d) return;
     e.preventDefault();
     const { x: px, y: py } = relPos(e);
-    const dx = px - d.startX, dy = py - d.startY;
-    const sc = d.startCrop;
     if (d.type === "move") {
-      setCrop(constrain({ ...sc, x: sc.x+dx, y: sc.y+dy }));
-    } else if (d.type === "create") {
-      let x=d.startX, y=d.startY, w=dx, h=dy;
-      if (w<0){x=px;w=-w;} if(h<0){y=py;h=-h;}
-      const ar = AR[aspectRef.current];
-      if (ar) h = w/ar;
-      setCrop(constrain({ x, y, w: Math.max(4,w), h: Math.max(4,h) }));
-    } else if (d.type === "resize") {
-      let { x, y, w, h } = { ...sc };
-      if (d.handle.includes("e")) w = Math.max(20, sc.w+dx);
-      if (d.handle.includes("s")) h = Math.max(20, sc.h+dy);
-      if (d.handle.includes("w")) { const nw=Math.max(20,sc.w-dx); x=sc.x+sc.w-nw; w=nw; }
-      if (d.handle.includes("n")) { const nh=Math.max(20,sc.h-dy); y=sc.y+sc.h-nh; h=nh; }
-      setCrop(constrain({ x, y, w, h }));
+      const dx = px - d.startX, dy = py - d.startY;
+      setCrop(constrain({ ...d.startCrop, x: d.startCrop.x + dx, y: d.startCrop.y + dy }));
+    } else {
+      let x = d.startX, y = d.startY, w = px - d.startX, h = py - d.startY;
+      if (w < 0) { x = px; w = -w; }
+      if (h < 0) { y = py; h = -h; }
+      setCrop(constrain({ x, y, w: Math.max(4, w), h: Math.max(4, h) }));
     }
   }, [constrain]);
 
@@ -122,344 +97,301 @@ export function CropModal({ src, onConfirm, onCancel }: { src: string; onConfirm
     const cr = containerRef.current?.getBoundingClientRect();
     if (!img || !cr) return;
     const c = cropRef.current;
-    const scale = Math.min(cr.width/img.naturalWidth, cr.height/img.naturalHeight);
-    const offX = (cr.width  - img.naturalWidth  * scale) / 2;
+    const scale = Math.min(cr.width / img.naturalWidth, cr.height / img.naturalHeight);
+    const offX = (cr.width - img.naturalWidth * scale) / 2;
     const offY = (cr.height - img.naturalHeight * scale) / 2;
-    const sx=(c.x-offX)/scale, sy=(c.y-offY)/scale;
-    const sw=c.w/scale, sh=c.h/scale;
-    const canvas=document.createElement("canvas");
-    canvas.width=Math.max(1,Math.round(sw));
-    canvas.height=Math.max(1,Math.round(sh));
-    canvas.getContext("2d")!.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-    onConfirm(canvas.toDataURL("image/jpeg",0.95));
-  };
-
-  const handlePositions: Record<string, any> = {
-    nw: { left: -7, top: -7 }, n: { left: "50%", top: -7, transform: "translateX(-50%)" },
-    ne: { right: -7, top: -7 }, w: { left: -7, top: "50%", transform: "translateY(-50%)" },
-    e: { right: -7, top: "50%", transform: "translateY(-50%)" },
-    sw: { left: -7, bottom: -7 }, s: { left: "50%", bottom: -7, transform: "translateX(-50%)" },
-    se: { right: -7, bottom: -7 },
+    const sx = (c.x - offX) / scale, sy = (c.y - offY) / scale;
+    const sw = c.w / scale, sh = c.h / scale;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(sw));
+    canvas.height = Math.max(1, Math.round(sh));
+    canvas.getContext("2d")!.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    onConfirm(canvas.toDataURL("image/jpeg", 0.95));
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.93)", fontFamily: FONT, display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", gap: 8, justifyContent: "center", padding: "14px 0", flexWrap: "wrap" }}>
-        {Object.keys(AR).map(k => (
-          <button key={k} onClick={() => changeAspect(k)} style={{
-            padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: "pointer",
-            border: `1px solid ${aspect === k ? RED : "#555"}`, background: "transparent", color: aspect === k ? RED : "#aaa",
-          }}>{k}</button>
-        ))}
-      </div>
-
-      <div ref={containerRef} style={{ flex: 1, height: "60vh", position: "relative", cursor: "crosshair", userSelect: "none", overflow: "hidden", margin: "0 20px", touchAction: "none" }}
+    <div className="fixed inset-0 z-[2000] bg-black/95 flex flex-col">
+      <div
+        ref={containerRef}
+        className="flex-1 relative cursor-crosshair select-none overflow-hidden mx-5 my-4"
+        style={{ touchAction: "none" }}
         onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp} onMouseLeave={onPointerUp}
-        onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}>
+        onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}
+      >
         <img ref={imgRef} src={src} crossOrigin="anonymous" onLoad={() => setImgLoaded(true)}
-          style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+          className="w-full h-full object-contain pointer-events-none" />
         {crop.w > 4 && crop.h > 4 && (
           <>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: crop.y, background: "rgba(0,0,0,0.6)" }} />
-            <div style={{ position: "absolute", top: crop.y + crop.h, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)" }} />
-            <div style={{ position: "absolute", top: crop.y, left: 0, width: crop.x, height: crop.h, background: "rgba(0,0,0,0.6)" }} />
-            <div style={{ position: "absolute", top: crop.y, left: crop.x + crop.w, right: 0, height: crop.h, background: "rgba(0,0,0,0.6)" }} />
-            <div style={{ position: "absolute", left: crop.x, top: crop.y, width: crop.w, height: crop.h, border: `2px solid ${RED}` }}>
-              {[1,2].map(i => <div key={`v${i}`} style={{ position: "absolute", left: `${i*33.33}%`, top: 0, width: 1, height: "100%", background: "rgba(255,255,255,0.2)" }} />)}
-              {[1,2].map(i => <div key={`h${i}`} style={{ position: "absolute", top: `${i*33.33}%`, left: 0, height: 1, width: "100%", background: "rgba(255,255,255,0.2)" }} />)}
-              {Object.entries(handlePositions).map(([k, pos]) => (
-                <div key={k} style={{ position: "absolute", width: 14, height: 14, background: RED, border: "2px solid #fff", borderRadius: 3, ...pos }} />
-              ))}
-            </div>
-            <div style={{ position: "absolute", left: crop.x, top: crop.y - 22, fontSize: 10, color: RED, fontFamily: FONT, fontWeight: 600 }}>
-              {Math.round(crop.w)} × {Math.round(crop.h)} px
-            </div>
+            <div className="absolute top-0 left-0 right-0 bg-black/60" style={{ height: crop.y }} />
+            <div className="absolute left-0 right-0 bottom-0 bg-black/60" style={{ top: crop.y + crop.h }} />
+            <div className="absolute bg-black/60" style={{ top: crop.y, left: 0, width: crop.x, height: crop.h }} />
+            <div className="absolute bg-black/60" style={{ top: crop.y, left: crop.x + crop.w, right: 0, height: crop.h }} />
+            <div className="absolute border-2 border-destructive" style={{ left: crop.x, top: crop.y, width: crop.w, height: crop.h }} />
           </>
         )}
-        {(!crop.w || crop.w <= 4) && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#666", fontSize: 13, fontFamily: FONT, pointerEvents: "none" }}>
-            Arraste na imagem para selecionar a área de corte
-          </div>
-        )}
       </div>
-
-      <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "14px 0" }}>
-        <button onClick={onCancel} style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid #555", background: "transparent", color: "#aaa", fontSize: 12, fontFamily: FONT, cursor: "pointer" }}>Cancelar</button>
-        <button onClick={applyCrop} disabled={crop.w <= 4} style={{ padding: "8px 20px", borderRadius: 6, border: "none", background: RED, color: "#fff", fontSize: 12, fontFamily: FONT, cursor: crop.w > 4 ? "pointer" : "not-allowed", opacity: crop.w > 4 ? 1 : 0.4, fontWeight: 600 }}>✅ Aplicar Recorte</button>
+      <div className="flex justify-center gap-3 p-4">
+        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+        <Button variant="destructive" onClick={applyCrop} disabled={crop.w <= 4}>✅ Aplicar Recorte</Button>
       </div>
     </div>
   );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  2. DragDropZone
+//  Upload helper
 // ════════════════════════════════════════════════════════════════════════════
-function DragDropZone({ onFile, currentImage }: { onFile: (f: File) => void; currentImage: string | null }) {
-  const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      onDragOver={e => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={e => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); }}
-      style={{
-        border: `2px dashed ${dragging ? RED : "#222"}`, borderRadius: 10, padding: 14,
-        cursor: "pointer", textAlign: "center", transition: "border-color 0.2s", minHeight: 80,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-      }}
-    >
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => e.target.files?.[0] && onFile(e.target.files[0])} />
-      {currentImage ? (
-        <div style={{ position: "relative" }}>
-          <img src={currentImage} style={{ width: 90, height: 60, objectFit: "cover", borderRadius: 6 }} alt="" />
-          <span style={{ position: "absolute", bottom: 2, right: 2, fontSize: 8, background: "rgba(0,0,0,0.7)", color: "#ccc", padding: "1px 4px", borderRadius: 3 }}>Trocar</span>
-        </div>
-      ) : (
-        <div style={{ color: "#555", fontSize: 12, fontFamily: FONT }}>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>📁</div>
-          Arraste ou clique para selecionar
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  3. CarouselPanel — with DB persistence
-// ════════════════════════════════════════════════════════════════════════════
-interface SlideData {
-  id: string;
-  position: number;
-  title: string;
-  subtitle: string;
-  image_url: string;
-}
-
-async function uploadImageToStorage(dataUrl: string, filename: string): Promise<string | null> {
+async function uploadToStorage(dataUrl: string): Promise<string | null> {
   const res = await fetch(dataUrl);
   const blob = await res.blob();
-  const path = `slides/${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const path = `slides/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
   const { error } = await supabase.storage.from("carousel").upload(path, blob, { contentType: "image/jpeg", upsert: true });
-  if (error) { toast.error("Erro ao fazer upload: " + error.message); return null; }
-  const { data } = supabase.storage.from("carousel").getPublicUrl(path);
-  return data.publicUrl;
+  if (error) { toast.error("Erro upload: " + error.message); return null; }
+  return supabase.storage.from("carousel").getPublicUrl(path).data.publicUrl;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  CarouselPanel — Full admin UI
+// ════════════════════════════════════════════════════════════════════════════
 export function CarouselPanel() {
   const [slides, setSlides] = useState<SlideData[]>([]);
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [previewIndex, setPreviewIndex] = useState(0);
+  const [selected, setSelected] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
-  const [cropTarget, setCropTarget] = useState<{ index: number } | null>(null);
-  const [draggingSlide, setDraggingSlide] = useState<number | null>(null);
-  const [dragOverSlide, setDragOverSlide] = useState<number | null>(null);
-
-  // Local pending image data URLs (not yet uploaded)
   const [pendingImages, setPendingImages] = useState<Record<number, string>>({});
+  const [fototeca, setFototeca] = useState<StorageFile[]>([]);
+  const [showFototeca, setShowFototeca] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchSlides = async () => {
-    const { data, error } = await supabase.from("carousel_slides").select("*").order("position");
-    if (!error && data) {
-      setSlides(data as SlideData[]);
-    }
+    const { data } = await supabase.from("carousel_slides").select("*").order("order_index");
+    if (data) setSlides(data.map(d => ({ id: d.id, order_index: d.order_index ?? d.position ?? 0, image_url: d.image_url, active: d.active ?? true })));
     setLoading(false);
   };
 
-  useEffect(() => { fetchSlides(); }, []);
+  const fetchFototeca = async () => {
+    const { data } = await supabase.storage.from("carousel").list("slides", { limit: 100, sortBy: { column: "created_at", order: "desc" } });
+    if (data) {
+      setFototeca(data.filter(f => !f.id?.endsWith("/")).map(f => ({
+        name: f.name,
+        url: supabase.storage.from("carousel").getPublicUrl(`slides/${f.name}`).data.publicUrl,
+      })));
+    }
+  };
 
-  const updateSlide = (idx: number, field: string, val: any) => {
-    setSlides(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s));
+  useEffect(() => { fetchSlides(); fetchFototeca(); }, []);
+
+  const s = slides[selected];
+
+  const addSlide = () => {
+    setSlides(prev => [...prev, { id: crypto.randomUUID(), order_index: prev.length, image_url: "", active: true }]);
+    setSelected(slides.length);
     setDirty(true);
   };
 
-  const handleFileForCrop = (idx: number, file: File) => {
+  const removeSlide = (idx: number) => {
+    if (slides.length <= 1) return;
+    const removed = slides[idx];
+    supabase.from("carousel_slides").delete().eq("id", removed.id).then();
+    setSlides(prev => prev.filter((_, i) => i !== idx));
+    setSelected(Math.min(selected, slides.length - 2));
+    setDirty(true);
+  };
+
+  const moveSlide = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= slides.length) return;
+    const arr = [...slides];
+    [arr[idx], arr[target]] = [arr[target], arr[idx]];
+    setSlides(arr);
+    setSelected(target);
+    setDirty(true);
+  };
+
+  const handleFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      setCropSrc(reader.result as string);
-      setCropTarget({ index: idx });
+      const dataUrl = reader.result as string;
+      setPendingImages(prev => ({ ...prev, [selected]: dataUrl }));
+      setSlides(prev => prev.map((sl, i) => i === selected ? { ...sl, image_url: dataUrl } : sl));
+      setDirty(true);
     };
     reader.readAsDataURL(file);
   };
 
+  const openCrop = () => {
+    if (!s || !s.image_url) return;
+    setCropSrc(s.image_url);
+  };
+
   const handleCropConfirm = (croppedUrl: string) => {
-    if (cropTarget) {
-      // Store as pending (data URL), will be uploaded on save
-      setPendingImages(prev => ({ ...prev, [cropTarget.index]: croppedUrl }));
-      updateSlide(cropTarget.index, "image_url", croppedUrl);
-    }
+    setPendingImages(prev => ({ ...prev, [selected]: croppedUrl }));
+    setSlides(prev => prev.map((sl, i) => i === selected ? { ...sl, image_url: croppedUrl } : sl));
     setCropSrc(null);
-    setCropTarget(null);
-  };
-
-  const addSlide = () => {
-    const newSlide: SlideData = {
-      id: crypto.randomUUID(),
-      position: slides.length,
-      title: `Slide ${slides.length + 1}`,
-      subtitle: "Subtítulo",
-      image_url: `https://placehold.co/1200x500/1a1a2e/ffffff?text=Slide+${slides.length + 1}`,
-    };
-    setSlides(prev => [...prev, newSlide]);
     setDirty(true);
   };
 
-  const removeSlide = async (idx: number) => {
-    if (slides.length <= 1) return;
-    const slide = slides[idx];
-    // Delete from DB
-    await supabase.from("carousel_slides").delete().eq("id", slide.id);
-    setSlides(prev => prev.filter((_, i) => i !== idx));
-    if (activeSlide >= slides.length - 1) setActiveSlide(Math.max(0, slides.length - 2));
+  const applyFototecaImage = (url: string) => {
+    setSlides(prev => prev.map((sl, i) => i === selected ? { ...sl, image_url: url } : sl));
     setDirty(true);
+    setShowFototeca(false);
+  };
+
+  const deleteFototecaFile = async (name: string) => {
+    await supabase.storage.from("carousel").remove([`slides/${name}`]);
+    setFototeca(prev => prev.filter(f => f.name !== name));
+    toast.success("Arquivo removido!");
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Upload any pending images first
-      const updatedSlides = [...slides];
+      const updated = [...slides];
       for (const [idxStr, dataUrl] of Object.entries(pendingImages)) {
         const idx = parseInt(idxStr);
         if (dataUrl.startsWith("data:")) {
-          const publicUrl = await uploadImageToStorage(dataUrl, `slide_${idx}.jpg`);
-          if (publicUrl) {
-            updatedSlides[idx] = { ...updatedSlides[idx], image_url: publicUrl };
-          }
+          const url = await uploadToStorage(dataUrl);
+          if (url) updated[idx] = { ...updated[idx], image_url: url };
         }
       }
-
-      // Upsert all slides with correct positions
-      for (let i = 0; i < updatedSlides.length; i++) {
-        updatedSlides[i] = { ...updatedSlides[i], position: i };
-      }
+      for (let i = 0; i < updated.length; i++) updated[i] = { ...updated[i], order_index: i };
 
       // Delete all existing and re-insert
       await supabase.from("carousel_slides").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       const { error } = await supabase.from("carousel_slides").insert(
-        updatedSlides.map(s => ({ id: s.id, position: s.position, title: s.title, subtitle: s.subtitle, image_url: s.image_url }))
+        updated.map(sl => ({ id: sl.id, order_index: sl.order_index, image_url: sl.image_url, active: sl.active, position: sl.order_index, title: "", subtitle: "" }))
       );
-
-      if (error) {
-        toast.error("Erro ao salvar: " + error.message);
-      } else {
-        setSlides(updatedSlides);
+      if (error) { toast.error("Erro ao salvar: " + error.message); }
+      else {
+        setSlides(updated);
         setPendingImages({});
         setDirty(false);
-        toast.success("Carrossel salvo com sucesso!");
+        toast.success("Carrossel atualizado!");
+        fetchFototeca();
       }
-    } catch (err: any) {
-      toast.error("Erro: " + err.message);
-    }
+    } catch (err: any) { toast.error("Erro: " + err.message); }
     setSaving(false);
   };
 
-  const handleDrop = (idx: number) => {
-    if (draggingSlide === null || draggingSlide === idx) return;
-    const arr = [...slides];
-    const [moved] = arr.splice(draggingSlide, 1);
-    arr.splice(idx, 0, moved);
-    setSlides(arr);
-    setActiveSlide(idx);
-    setDraggingSlide(null);
-    setDragOverSlide(null);
-    setDirty(true);
-  };
-
-  if (loading) return <div style={{ color: "#666", fontSize: 12, padding: 10 }}>Carregando...</div>;
-
-  const s = slides[activeSlide] || slides[0];
-  const pSlide = slides[previewIndex] || slides[0];
-
-  if (!s) return <div style={{ color: "#666", fontSize: 12, padding: 10 }}>Nenhum slide encontrado.</div>;
+  if (loading) return <div className="p-6 text-muted-foreground">Carregando...</div>;
 
   return (
-    <div style={{ fontFamily: FONT, color: "#ccc", fontSize: 12 }}>
-      {cropSrc && <CropModal src={cropSrc} onConfirm={handleCropConfirm} onCancel={() => { setCropSrc(null); setCropTarget(null); }} />}
+    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      {cropSrc && <CropModal src={cropSrc} onConfirm={handleCropConfirm} onCancel={() => setCropSrc(null)} />}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
 
-      {/* Preview mini */}
-      <div style={{ position: "relative", height: 130, borderRadius: 8, overflow: "hidden", marginBottom: 10, background: "#111" }}>
-        {pSlide && <img src={pSlide.image_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)" }} />
-        <div style={{ position: "absolute", bottom: 10, left: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{pSlide?.title}</div>
-          <div style={{ fontSize: 10, color: "#aaa" }}>{pSlide?.subtitle}</div>
-        </div>
-        <div style={{ position: "absolute", top: 6, right: 8, fontSize: 9, background: "rgba(0,0,0,0.5)", color: "#aaa", padding: "2px 6px", borderRadius: 4 }}>👁️ Preview</div>
-        <button onClick={() => setPreviewIndex((previewIndex - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 4, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.4)", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", borderRadius: 4, width: 22, height: 26 }}>‹</button>
-        <button onClick={() => setPreviewIndex((previewIndex + 1) % slides.length)} style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.4)", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", borderRadius: 4, width: 22, height: 26 }}>›</button>
-        <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
-          {slides.map((_, i) => (
-            <button key={i} onClick={() => setPreviewIndex(i)} style={{ width: 6, height: 6, borderRadius: "50%", border: "none", background: i === previewIndex ? "#fff" : "#555", cursor: "pointer", padding: 0 }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Slides label */}
-      <div style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#555", marginBottom: 5 }}>Slides ({slides.length})</div>
-
-      {/* Slides list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-        {slides.map((sl, i) => (
-          <div key={sl.id} draggable
-            onDragStart={() => setDraggingSlide(i)}
-            onDragOver={e => { e.preventDefault(); setDragOverSlide(i); }}
-            onDrop={() => handleDrop(i)}
-            onDragEnd={() => { setDraggingSlide(null); setDragOverSlide(null); }}
-            onClick={() => { setActiveSlide(i); setPreviewIndex(i); }}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 6, cursor: "pointer",
-              border: `1px solid ${i === activeSlide ? RED : dragOverSlide === i ? "#555" : "#1e1e1e"}`,
-              background: i === activeSlide ? "rgba(230,57,70,0.08)" : "#111",
-            }}>
-            <img src={sl.image_url} style={{ width: 40, height: 28, objectFit: "cover", borderRadius: 4 }} alt="" />
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: i === activeSlide ? "#fff" : "#888" }}>{sl.title}</span>
-            <span style={{ fontSize: 10, color: "#444", cursor: "grab" }}>⠿</span>
-            {slides.length > 1 && (
-              <button onClick={e => { e.stopPropagation(); removeSlide(i); }} style={{ background: "none", border: "none", color: "#555", fontSize: 12, cursor: "pointer", padding: "0 2px" }}>×</button>
-            )}
+      {/* Preview 16:9 */}
+      <div className="relative w-full rounded-lg overflow-hidden bg-muted/20 border border-border" style={{ aspectRatio: "16/9" }}>
+        {s?.image_url ? (
+          <img src={s.image_url} className="w-full h-full object-cover" alt="" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+            <Image className="mr-2 h-5 w-5" /> Nenhuma imagem
           </div>
-        ))}
+        )}
+        {s && (
+          <div className="absolute top-2 right-2 bg-black/60 text-xs text-white px-2 py-1 rounded">
+            Slide {selected + 1} {s.active ? "✅" : "⛔"}
+          </div>
+        )}
       </div>
 
-      <button onClick={addSlide} style={{ width: "100%", padding: "6px 0", border: "2px dashed #222", borderRadius: 6, background: "transparent", color: "#555", fontSize: 11, fontFamily: FONT, cursor: "pointer", marginBottom: 10 }}>+ Novo Slide</button>
-
-      {/* Editor */}
-      <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid #1e1e1e", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-        <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Editando slide {activeSlide + 1}</div>
-        <DragDropZone onFile={f => handleFileForCrop(activeSlide, f)} currentImage={s.image_url.startsWith("https://placehold") ? null : s.image_url} />
-        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          <button onClick={() => { if (!s.image_url.startsWith("https://placehold")) { setCropSrc(s.image_url); setCropTarget({ index: activeSlide }); } }}
-            disabled={s.image_url.startsWith("https://placehold")}
-            style={{ flex: 1, padding: "6px 0", border: "1px solid #333", borderRadius: 6, background: "transparent", color: s.image_url.startsWith("https://placehold") ? "#333" : "#aaa", fontSize: 10, fontFamily: FONT, cursor: s.image_url.startsWith("https://placehold") ? "not-allowed" : "pointer" }}>
-            ✂️ Recortar
+      {/* Slide tabs */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {slides.map((sl, i) => (
+          <button
+            key={sl.id}
+            onClick={() => setSelected(i)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+              i === selected
+                ? "bg-primary text-primary-foreground border-primary"
+                : sl.active
+                  ? "bg-muted text-foreground border-border hover:bg-muted/80"
+                  : "bg-muted/30 text-muted-foreground border-border/50 opacity-60"
+            }`}
+          >
+            {i + 1}
           </button>
-        </div>
-        <input value={s.title} onChange={e => updateSlide(activeSlide, "title", e.target.value)} placeholder="Título"
-          style={{ width: "100%", marginTop: 8, padding: "7px 10px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, color: "#ccc", fontSize: 12, fontFamily: FONT, outline: "none", boxSizing: "border-box" }}
-          onFocus={e => (e.target.style.borderColor = RED)} onBlur={e => (e.target.style.borderColor = "#222")} />
-        <textarea value={s.subtitle} onChange={e => updateSlide(activeSlide, "subtitle", e.target.value)} placeholder="Subtítulo" rows={2}
-          style={{ width: "100%", marginTop: 6, padding: "7px 10px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, color: "#ccc", fontSize: 12, fontFamily: FONT, outline: "none", resize: "none", boxSizing: "border-box" }}
-          onFocus={e => (e.target.style.borderColor = RED)} onBlur={e => (e.target.style.borderColor = "#222")} />
+        ))}
+        <button
+          onClick={addSlide}
+          className="px-3 py-1.5 rounded-md text-sm font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* SAVE BUTTON */}
-      <button onClick={handleSave} disabled={saving || !dirty}
-        style={{
-          width: "100%", padding: "10px 0", border: "none", borderRadius: 8,
-          background: dirty ? `linear-gradient(135deg, ${RED}, #c1121f)` : "#333",
-          color: dirty ? "#fff" : "#666", fontSize: 13, fontWeight: 700,
-          fontFamily: FONT, cursor: dirty ? "pointer" : "not-allowed",
-          marginBottom: 8, transition: "all 0.2s",
-        }}>
-        {saving ? "Salvando..." : dirty ? "💾 Salvar Carrossel" : "✅ Salvo"}
-      </button>
+      {/* Slide controls */}
+      {s && (
+        <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-foreground">Slide {selected + 1}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Ativo</span>
+              <Switch
+                checked={s.active}
+                onCheckedChange={(v) => { setSlides(prev => prev.map((sl, i) => i === selected ? { ...sl, active: v } : sl)); setDirty(true); }}
+              />
+            </div>
+          </div>
 
-      <div style={{ fontSize: 9, color: "#444", textAlign: "center" }}>Upload → ✂️ Recortar → 💾 Salvar</div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+              <Upload className="mr-1 h-3.5 w-3.5" /> Enviar arquivo
+            </Button>
+            <Button variant="outline" size="sm" onClick={openCrop} disabled={!s.image_url}>
+              <Scissors className="mr-1 h-3.5 w-3.5" /> Crop
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => moveSlide(selected, -1)} disabled={selected === 0}>
+              <ArrowUp className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => moveSlide(selected, 1)} disabled={selected === slides.length - 1}>
+              <ArrowDown className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => removeSlide(selected)} disabled={slides.length <= 1}>
+              <Trash2 className="mr-1 h-3.5 w-3.5" /> Deletar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Fototeca */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <button onClick={() => { setShowFototeca(!showFototeca); if (!showFototeca) fetchFototeca(); }}
+          className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors w-full text-left">
+          <FolderOpen className="h-4 w-4" />
+          Fototeca ({fototeca.length} arquivos)
+          <span className="text-xs text-muted-foreground ml-auto">{showFototeca ? "▲" : "▼"}</span>
+        </button>
+        {showFototeca && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 pt-2">
+            {fototeca.length === 0 && <p className="col-span-full text-xs text-muted-foreground">Nenhum arquivo no bucket.</p>}
+            {fototeca.map(f => (
+              <div key={f.name} className="relative group rounded-md overflow-hidden border border-border aspect-square cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                onClick={() => applyFototecaImage(f.url)}>
+                <img src={f.url} className="w-full h-full object-cover" alt={f.name} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteFototecaFile(f.name); }}
+                  className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Save */}
+      <Button onClick={handleSave} disabled={saving || !dirty} className="w-full" size="lg">
+        <Save className="mr-2 h-4 w-4" />
+        {saving ? "Salvando..." : dirty ? "Salvar alterações" : "✅ Salvo"}
+      </Button>
     </div>
   );
 }
+
+// Keep default export for sidebar embedding
+export default CarouselPanel;

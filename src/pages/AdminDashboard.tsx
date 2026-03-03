@@ -8,6 +8,7 @@ import { GanhosTab } from "@/components/tabs/GanhosTab";
 import TabDashboard from "@/components/tabs/TabDashboard";
 import TabAgendamentos from "@/components/tabs/TabAgendamentos";
 import TabCadastrantes from "@/components/tabs/TabCadastrantes";
+import { CarouselPanel } from "@/components/admin/CarouselManager";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -85,6 +86,7 @@ const AdminDashboard = () => {
             {activeTab === "cadastrantes" && <TabCadastrantes />}
             {activeTab === "servicos" && <ServicosAdminTab />}
             {activeTab === "ganhos" && <GanhosTab />}
+            {activeTab === "carousel" && <CarouselPanel />}
           </div>
         </main>
       </div>
