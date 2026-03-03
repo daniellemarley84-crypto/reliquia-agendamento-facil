@@ -90,6 +90,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          banned: boolean
           birth_date: string | null
           created_at: string
           id: string
@@ -99,6 +100,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          banned?: boolean
           birth_date?: string | null
           created_at?: string
           id?: string
@@ -108,6 +110,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          banned?: boolean
           birth_date?: string | null
           created_at?: string
           id?: string
