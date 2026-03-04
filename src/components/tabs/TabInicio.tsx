@@ -14,21 +14,13 @@ const FALLBACK_SLIDES = [
   { id: "3", src: "/photos/foto3.jpg", alt: "Foto 3" },
 ];
 
-const C = {
-  bg: "#0d0c0a", bg2: "#141210", bg3: "#1c1a16", bg4: "#242018",
-  gold: "#c9a84c", goldL: "#f0d080", goldD: "#7a5f25",
-  text: "#e8dfc8", textD: "#8a7f6a", white: "#ffffff", black: "#000000",
-  DM: "'DM Sans', sans-serif",
-};
-
 export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const [slides, setSlides] = useState(FALLBACK_SLIDES);
+  const [slides, setSlides] = useState<typeof FALLBACK_SLIDES | null>(null); // ✅ começa vazio
   const [current, setCurrent] = useState(0);
   const [hover, setHover] = useState(false);
   const startX = useRef(0);
   const dragging = useRef(false);
   const timer = useRef<any>(null);
-  const total = slides.length;
 
   useEffect(() => {
     const load = async () => {
@@ -39,10 +31,22 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
         .order("order_index");
       if (data && data.length > 0) {
         setSlides(data.map(s => ({ id: s.id, src: s.image_url, alt: s.title || "" })));
+      } else {
+        setSlides(FALLBACK_SLIDES); // ✅ fallback só se Supabase não retornar nada
       }
     };
     load();
   }, []);
+
+  // ✅ não renderiza nada enquanto carrega
+  if (!slides) return (
+    <div style={{ background: "#0d0c0a", minHeight: "100%", display: "flex",
+      alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#c9a84c", fontFamily: "'DM Sans', sans-serif", fontSize: 24 }}>...</div>
+    </div>
+  );
+
+  const total = slides.length; // ✅ só executa depois que slides está pronto
 
   const next = () => setCurrent(c => (c + 1) % total);
   const prev = () => setCurrent(c => (c - 1 + total) % total);
