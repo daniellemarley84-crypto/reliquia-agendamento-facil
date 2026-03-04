@@ -39,11 +39,27 @@ export default function TabCadastrantes() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: profiles } = await supabase
+      let profiles: any[] | null = null;
+
+      const primary = await supabase
         .from("profiles")
         .select("id, user_id, name, phone, created_at, is_admin, banned")
         .eq("is_admin", false)
         .order("created_at", { ascending: false });
+
+      if (primary.error?.code === "42703") {
+        const fallback = await supabase
+          .from("profiles")
+          .select("id, user_id, name, phone, created_at, is_admin")
+          .eq("is_admin", false)
+          .order("created_at", { ascending: false });
+
+        if (fallback.error) throw fallback.error;
+        profiles = fallback.data;
+      } else {
+        if (primary.error) throw primary.error;
+        profiles = primary.data;
+      }
 
       if (profiles) {
         setUsers(profiles.map((p: any) => {
@@ -59,8 +75,10 @@ export default function TabCadastrantes() {
           };
         }));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao carregar cadastrantes:", err);
+      toast.error("Erro ao carregar cadastrantes: " + (err?.message || "falha desconhecida"));
+      setUsers([]);
     }
     setLoading(false);
   };
@@ -75,7 +93,11 @@ export default function TabCadastrantes() {
       .eq("id", user.id);
 
     if (error) {
-      toast.error("Erro ao atualizar status: " + error.message);
+      if (error.code === "42703") {
+        toast.error("O campo de banimento ainda não está disponível no banco conectado.");
+      } else {
+        toast.error("Erro ao atualizar status: " + error.message);
+      }
       return;
     }
     toast.success(newBanned ? `${user.nome} foi banido` : `${user.nome} foi desbanido`);

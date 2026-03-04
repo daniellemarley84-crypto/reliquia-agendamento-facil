@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 if (!document.querySelector('link[href*="DM+Sans"]')) {
   const l = document.createElement("link");
@@ -374,8 +375,7 @@ const HORARIOS = (() => {
   return slots;
 })();
 
-// Sem horários bloqueados fixos — todos disponíveis
-const BLOQUEADOS = new Set<string>();
+// Horários bloqueados são calculados dinamicamente por data selecionada
 
 function getDiasDoMes(ano, mes) {
   const primeiroDia = new Date(ano, mes, 1).getDay();
@@ -479,7 +479,17 @@ function Calendario({ dataSelecionada, onSelect }) {
 // ════════════════════════════════════════════════════════════════════════════
 //  SELETOR DE HORÁRIOS
 // ════════════════════════════════════════════════════════════════════════════
-function SeletorHorario({ horarioSelecionado, onSelect }) {
+function SeletorHorario({
+  horarioSelecionado,
+  onSelect,
+  occupiedTimes,
+  loading,
+}: {
+  horarioSelecionado: string | null;
+  onSelect: (value: string) => void;
+  occupiedTimes: Set<string>;
+  loading: boolean;
+}) {
   return (
     <div style={{ background:C.bg3, border:"1px solid #2e2b24", borderRadius:12, padding:"14px 12px", marginBottom:16 }}>
       <div style={{ fontSize:11, color:C.textD, letterSpacing:2, textTransform:"uppercase", marginBottom:12, fontFamily:C.DM }}>
@@ -487,13 +497,13 @@ function SeletorHorario({ horarioSelecionado, onSelect }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:7 }}>
         {HORARIOS.map(h => {
-          const bloq = BLOQUEADOS.has(h);
+          const bloq = occupiedTimes.has(h);
           const sel  = horarioSelecionado === h;
           return (
             <button
               key={h}
-              disabled={bloq}
-              onClick={() => !bloq && onSelect(h)}
+              disabled={bloq || loading}
+              onClick={() => !bloq && !loading && onSelect(h)}
               style={{
                 padding: "8px 4px",
                 borderRadius: 8,
@@ -503,9 +513,10 @@ function SeletorHorario({ horarioSelecionado, onSelect }) {
                 fontSize: 12,
                 fontWeight: sel ? 700 : 500,
                 fontFamily: C.DM,
-                cursor: bloq ? "not-allowed" : "pointer",
+                cursor: bloq || loading ? "not-allowed" : "pointer",
                 textDecoration: bloq ? "line-through" : "none",
                 transition: "all 0.15s",
+                opacity: loading ? 0.7 : 1,
               }}
             >
               {h}
@@ -531,17 +542,52 @@ function SeletorHorario({ horarioSelecionado, onSelect }) {
 //  ETAPA 2 — Confirmação
 // ════════════════════════════════════════════════════════════════════════════
 function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
-  const [hover,    setHover]    = useState(false);
-  const [data,     setData]     = useState(null);
-  const [horario,  setHorario]  = useState(null);
+  const [hover, setHover] = useState(false);
+  const [data, setData] = useState<{ dia: number; mes: number; ano: number } | null>(null);
+  const [horario, setHorario] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
+  const [occupiedTimes, setOccupiedTimes] = useState<Set<string>>(new Set());
+  const [loadingTimes, setLoadingTimes] = useState(false);
 
-  const combo          = comboAtivo ?? detectarCombo(selecionados);
+  const combo = comboAtivo ?? detectarCombo(selecionados);
   const servicosExtras = combo ? selecionados.filter(id => !combo.servicos.includes(id)) : selecionados;
-  const extraTotal     = servicosExtras.reduce((s, id) => s + (PRECOS[id] ?? 0), 0);
-  const precoFinal     = combo ? combo.price + extraTotal : selecionados.reduce((s, id) => s + (PRECOS[id] ?? 0), 0);
-  const precoSemCombo  = combo ? calcularPrecoSemCombo(combo) : 0;
-  const pronto         = data && horario;
+  const extraTotal = servicosExtras.reduce((s, id) => s + (PRECOS[id] ?? 0), 0);
+  const precoFinal = combo ? combo.price + extraTotal : selecionados.reduce((s, id) => s + (PRECOS[id] ?? 0), 0);
+  const precoSemCombo = combo ? calcularPrecoSemCombo(combo) : 0;
+  const pronto = data && horario;
+
+  const dateStr = data
+    ? `${data.ano}-${String(data.mes + 1).padStart(2, "0")}-${String(data.dia).padStart(2, "0")}`
+    : null;
+
+  useEffect(() => {
+    const loadOccupiedTimes = async () => {
+      if (!dateStr) {
+        setOccupiedTimes(new Set());
+        return;
+      }
+
+      setLoadingTimes(true);
+      const { data: existing, error } = await supabase
+        .from("appointments")
+        .select("appointment_time")
+        .eq("appointment_date", dateStr)
+        .eq("status", "confirmado");
+
+      if (!error && existing) {
+        setOccupiedTimes(new Set(existing.map((row) => row.appointment_time)));
+      }
+      setLoadingTimes(false);
+    };
+
+    loadOccupiedTimes();
+  }, [dateStr]);
+
+  useEffect(() => {
+    if (horario && occupiedTimes.has(horario)) {
+      setHorario(null);
+    }
+  }, [occupiedTimes, horario]);
 
   const dataFormatada = data
     ? `${String(data.dia).padStart(2,"0")}/${String(data.mes+1).padStart(2,"0")}/${data.ano}`
@@ -655,7 +701,12 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
 
         {/* Horários — só mostra se data escolhida */}
         {data && (
-          <SeletorHorario horarioSelecionado={horario} onSelect={setHorario} />
+          <SeletorHorario
+            horarioSelecionado={horario}
+            onSelect={setHorario}
+            occupiedTimes={occupiedTimes}
+            loading={loadingTimes}
+          />
         )}
 
         {/* Resumo seleção */}
@@ -674,22 +725,51 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
           onClick={async () => {
-            if (!pronto) return;
+            if (!pronto || !dateStr || !horario) return;
+
             try {
-              const { supabase } = await import("@/integrations/supabase/client");
               const { data: { session } } = await supabase.auth.getSession();
               if (!session) { alert("Você precisa estar logado."); return; }
-              const dateStr = `${data.ano}-${String(data.mes+1).padStart(2,"0")}-${String(data.dia).padStart(2,"0")}`;
-              // Use first selected service id or create a generic entry
-              const serviceName = combo ? combo.name : selecionados.map(id => allServicos.find(s=>s.id===id)?.name).filter(Boolean).join(", ");
-              // Find a matching service in DB or use first one
+
+              // Bloqueia novo agendamento da mesma pessoa na mesma data
+              const { data: ownAppointment, error: ownError } = await supabase
+                .from("appointments")
+                .select("id")
+                .eq("user_id", session.user.id)
+                .eq("appointment_date", dateStr)
+                .eq("status", "confirmado")
+                .limit(1)
+                .maybeSingle();
+
+              if (ownError) {
+                alert("Erro ao validar agendamentos existentes.");
+                return;
+              }
+
+              if (ownAppointment) {
+                alert("Você já possui um agendamento confirmado nesta data.");
+                return;
+              }
+
+              if (occupiedTimes.has(horario)) {
+                alert("Esse horário já está ocupado. Escolha outro horário.");
+                return;
+              }
+
               const { data: dbServices } = await supabase.from("services").select("id, name").limit(100);
               let serviceId = dbServices?.[0]?.id;
+
               if (dbServices) {
-                const match = dbServices.find(s => selecionados.some(sel => s.name.toLowerCase().includes(allServicos.find(x=>x.id===sel)?.name?.toLowerCase() || "")));
+                const match = dbServices.find(s =>
+                  selecionados.some(sel =>
+                    s.name.toLowerCase().includes(allServicos.find(x => x.id === sel)?.name?.toLowerCase() || "")
+                  )
+                );
                 if (match) serviceId = match.id;
               }
+
               if (!serviceId) { alert("Nenhum serviço cadastrado no sistema."); return; }
+
               const { error } = await supabase.from("appointments").insert({
                 user_id: session.user.id,
                 service_id: serviceId,
@@ -698,9 +778,20 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
                 combo: !!combo,
                 status: "confirmado",
               });
-              if (error) { alert("Erro ao agendar: " + error.message); return; }
+
+              if (error) {
+                if ((error as any).code === "23505") {
+                  alert("Esse horário já foi reservado. Escolha outro horário.");
+                } else {
+                  alert("Erro ao agendar: " + error.message);
+                }
+                return;
+              }
+
               setConfirmado(true);
-            } catch (err: any) { alert("Erro: " + err.message); }
+            } catch (err: any) {
+              alert("Erro: " + err.message);
+            }
           }}
         >
           {pronto ? "Confirmar Agendamento ✓" : "Escolha data e horário"}

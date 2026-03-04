@@ -41,11 +41,17 @@ const Signup = () => {
     const formattedBirth = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : null;
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const phoneDigits = phone.replace(/\D/g, "");
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name },
+        data: {
+          name,
+          birth_date: formattedBirth,
+          phone: phoneDigits,
+        },
         emailRedirectTo: window.location.origin,
       },
     });
@@ -53,7 +59,7 @@ const Signup = () => {
     if (error) {
       setLoading(false);
       if (error.message.includes("database error")) {
-        toast.error("Falha ao cadastrar. Por favor, tente novamente.");
+        toast.error("Falha ao cadastrar. Verifique os dados e tente novamente.");
       } else if (error.message.includes("already registered")) {
         toast.error("Este email já está cadastrado. Tente fazer login.");
       } else {
@@ -62,15 +68,18 @@ const Signup = () => {
       return;
     }
 
-    // Wait for trigger to create profile, then update
-const { data: { user } } = await supabase.auth.getUser();
-if (user) {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  await supabase.from("profiles").update({
-    birth_date: formattedBirth,
-    phone: phone.replace(/\D/g, ""),
-  }).eq("user_id", user.id);
-}
+    const user = data.user;
+    if (user) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      await supabase
+        .from("profiles")
+        .update({
+          birth_date: formattedBirth,
+          phone: phoneDigits || null,
+        })
+        .eq("user_id", user.id);
+    }
+
     setLoading(false);
     toast.success("Conta criada! Verifique seu email para confirmar.");
     navigate("/login");
