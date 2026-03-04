@@ -14,8 +14,10 @@ const FALLBACK_SLIDES = [
   { id: "3", src: "/photos/foto3.jpg", alt: "Foto 3" },
 ];
 
+const DM = "'DM Sans', sans-serif";
+
 export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const [slides, setSlides] = useState<typeof FALLBACK_SLIDES | null>(null); // ✅ começa vazio
+  const [slides, setSlides] = useState<typeof FALLBACK_SLIDES | null>(null);
   const [current, setCurrent] = useState(0);
   const [hover, setHover] = useState(false);
   const startX = useRef(0);
@@ -32,26 +34,31 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
       if (data && data.length > 0) {
         setSlides(data.map(s => ({ id: s.id, src: s.image_url, alt: s.title || "" })));
       } else {
-        setSlides(FALLBACK_SLIDES); // ✅ fallback só se Supabase não retornar nada
+        setSlides(FALLBACK_SLIDES);
       }
     };
     load();
   }, []);
 
-  // ✅ não renderiza nada enquanto carrega
+  useEffect(() => {
+    if (!slides) return;
+    const next = () => setCurrent(c => (c + 1) % slides.length);
+    timer.current = setInterval(next, 2000);
+    return () => clearInterval(timer.current);
+  }, [slides]);
+
   if (!slides) return (
     <div style={{ background: "#0d0c0a", minHeight: "100%", display: "flex",
       alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: "#c9a84c", fontFamily: "'DM Sans', sans-serif", fontSize: 24 }}>...</div>
+      <div style={{ color: "#c9a84c", fontFamily: DM, fontSize: 24 }}>...</div>
     </div>
   );
 
-  const total = slides.length; // ✅ só executa depois que slides está pronto
+  const total = slides.length;
 
   const next = () => setCurrent(c => (c + 1) % total);
   const prev = () => setCurrent(c => (c - 1 + total) % total);
   const resetTimer = () => { clearInterval(timer.current); timer.current = setInterval(next, 2000); };
-  useEffect(() => { resetTimer(); return () => clearInterval(timer.current); }, [total]);
 
   const onDown = (e: any) => { startX.current = e.clientX ?? e.touches?.[0]?.clientX; dragging.current = true; };
   const onUp = (e: any) => {
@@ -65,21 +72,21 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "28px 0 32px", gap: 20,
-      background: C.black, minHeight: "100%", fontFamily: C.DM
+      background: "#000000", minHeight: "100%", fontFamily: DM
     }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%", padding: "0 16px" }}>
-        <div style={{ width: 48, height: 1, background: C.white }} />
+        <div style={{ width: 48, height: 1, background: "#ffffff" }} />
         <h1 style={{
-          fontFamily: C.DM, color: C.white, fontSize: 12, fontWeight: 400,
+          fontFamily: DM, color: "#ffffff", fontSize: 12, fontWeight: 400,
           letterSpacing: "0.22em", textTransform: "uppercase",
           textAlign: "center", margin: 0, lineHeight: 1.8
         }}>
           BEM-VINDO A<br />
-          <span style={{ fontFamily: C.DM, fontSize: 22, fontWeight: 800, letterSpacing: "0.08em" }}>
+          <span style={{ fontFamily: DM, fontSize: 22, fontWeight: 800, letterSpacing: "0.08em" }}>
             RELÍQUIA BARBER
           </span>
         </h1>
-        <div style={{ width: 48, height: 1, background: C.white }} />
+        <div style={{ width: 48, height: 1, background: "#ffffff" }} />
       </div>
 
       <div
@@ -120,7 +127,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
             position: "absolute", top: "50%", transform: "translateY(-50%)", ...pos,
             background: "rgba(0,0,0,0.15)", border: "1px solid rgba(255,255,255,0.05)",
             color: "rgba(255,255,255,0.5)", borderRadius: 6, width: 28, height: 32,
-            fontSize: 22, fontWeight: 300, fontFamily: C.DM,
+            fontSize: 22, fontWeight: 300, fontFamily: DM,
             cursor: "pointer", display: "flex", alignItems: "center",
             justifyContent: "center", padding: 0, zIndex: 10
           }}
@@ -134,7 +141,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
           <button key={i} style={{
             width: 7, height: 7, borderRadius: "50%", border: "none", padding: 0,
             cursor: "pointer", transition: "all 0.3s",
-            background: i === current ? C.white : "#444",
+            background: i === current ? "#ffffff" : "#444",
             transform: i === current ? "scale(1.3)" : "scale(1)"
           }}
             onClick={() => { setCurrent(i); resetTimer(); }}
@@ -146,10 +153,10 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           width: "calc(100% - 32px)", maxWidth: 400, padding: "14px 0",
-          background: hover ? "#e0e0e0" : C.white, color: C.black,
+          background: hover ? "#e0e0e0" : "#ffffff", color: "#000000",
           border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700,
           letterSpacing: "0.18em", textTransform: "uppercase",
-          fontFamily: C.DM, cursor: "pointer", transition: "all 0.2s",
+          fontFamily: DM, cursor: "pointer", transition: "all 0.2s",
           transform: hover ? "translateY(-1px)" : "none",
           boxShadow: hover ? "0 6px 20px rgba(255,255,255,0.12)" : "0 2px 10px rgba(255,255,255,0.06)",
           margin: "0 16px",
