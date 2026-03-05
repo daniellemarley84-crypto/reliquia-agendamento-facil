@@ -46,7 +46,7 @@ function DashboardContent({ user, activeTab, setActiveTab, handleLogout }: {
     switch (activeTab) {
       case "inicio": return <TabInicio onNavigate={(tab: string) => setActiveTab(tab === "agendar" ? "agendamentos" : tab)} />;
       case "perfil": return <PerfilTab userId={user.id} />;
-      case "agendamentos": return <TabAgendar />;
+      case "agendamentos": return <TabAgendar onGoHome={() => setActiveTab("inicio")} />;
       case "localizacao": return <LocalizacaoTab />;
       case "suporte": return <SuporteTab />;
       case "pagar": return <PagarTab userId={user.id} />;

@@ -541,7 +541,7 @@ function SeletorHorario({
 // ════════════════════════════════════════════════════════════════════════════
 //  ETAPA 2 — Confirmação
 // ════════════════════════════════════════════════════════════════════════════
-function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
+function StepConfirmar({ selecionados, comboAtivo, onBack, onGoHome, animClass }: { selecionados: string[]; comboAtivo: any; onBack: () => void; onGoHome?: () => void; animClass: string }) {
   const [hover, setHover] = useState(false);
   const [data, setData] = useState<{ dia: number; mes: number; ano: number } | null>(null);
   const [horario, setHorario] = useState<string | null>(null);
@@ -607,6 +607,31 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
             <div style={{ fontSize:22, fontWeight:800, color:C.goldL, marginTop:8 }}>R${precoFinal},00</div>
           </div>
           <p style={{ fontSize:11, color:C.textD, textAlign:"center", letterSpacing:1 }}>Até logo! ✂️</p>
+          <button
+            onClick={() => {
+              if (onGoHome) {
+                onGoHome();
+                return;
+              }
+              window.location.href = "/";
+            }}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              background: C.gold,
+              border: "none",
+              borderRadius: 10,
+              color: C.bg,
+              fontFamily: C.DM,
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: 1.4,
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            Voltar para tela inicial
+          </button>
         </div>
       </div>
     );
@@ -804,7 +829,7 @@ function StepConfirmar({ selecionados, comboAtivo, onBack, animClass }) {
 // ════════════════════════════════════════════════════════════════════════════
 //  EXPORT DEFAULT — TabAgendar
 // ════════════════════════════════════════════════════════════════════════════
-export default function TabAgendar() {
+export default function TabAgendar({ onGoHome }: { onGoHome?: () => void } = {}) {
   const [step,         setStep]         = useState(0);
   const [selecionados, setSelecionados] = useState([]);
   const [comboAtivo,   setComboAtivo]   = useState(null);
@@ -864,6 +889,7 @@ export default function TabAgendar() {
             selecionados={selecionados}
             comboAtivo={comboAtivo}
             onBack={handleBack}
+            onGoHome={onGoHome}
             animClass={animClass}
           />
         )}
