@@ -8,11 +8,7 @@ if (!document.querySelector('link[href*="DM+Sans"]')) {
   document.head.appendChild(l);
 }
 
-const FALLBACK_SLIDES = [
-  { id: "1", src: "/photos/foto1.jpg", alt: "Foto 1" },
-  { id: "2", src: "/photos/foto2.jpg", alt: "Foto 2" },
-  { id: "3", src: "/photos/foto3.jpg", alt: "Foto 3" },
-];
+const FALLBACK_SLIDES: { id: string; src: string; alt: string }[] = [];
 
 const DM = "'DM Sans', sans-serif";
 
@@ -41,7 +37,7 @@ export default function TabInicio({ onNavigate }: { onNavigate: (tab: string) =>
   }, []);
 
   useEffect(() => {
-    if (!slides) return;
+    if (!slides || slides.length === 0) return;
     const next = () => setCurrent(c => (c + 1) % slides.length);
     timer.current = setInterval(next, 2000);
     return () => clearInterval(timer.current);
