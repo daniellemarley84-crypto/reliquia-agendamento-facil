@@ -21,6 +21,7 @@ const T = {
 const statusColor = (s: string) => s === "confirmado" ? T.green : s === "cancelado" ? T.red : T.gold;
 
 interface AgendaItem {
+  id: string;
   hora: string;
   cliente: string;
   servico: string;
@@ -35,60 +36,76 @@ export default function TabDashboard() {
   const [faturamento, setFaturamento] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Count profiles (all are "ativo" since we don't have a ban field yet)
-        const { count: totalProfiles } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-        setAtivos(totalProfiles || 0);
-        setBanidos(0);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { count: totalProfiles } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("banned", false);
+      const { count: totalBanned } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("banned", true);
+      setAtivos(totalProfiles || 0);
+      setBanidos(totalBanned || 0);
 
-        // Today's appointments
-        const today = new Date().toISOString().split("T")[0];
-        const { data: appts } = await supabase
-          .from("appointments")
-          .select("appointment_time, status, combo, service_id, user_id")
-          .eq("appointment_date", today);
+      const today = new Date().toISOString().split("T")[0];
+      const { data: appts } = await supabase
+        .from("appointments")
+        .select("id, appointment_time, status, combo, service_id, user_id")
+        .eq("appointment_date", today)
+        .neq("status", "cancelado");
 
-        if (appts && appts.length > 0) {
-          // Get service details
-          const serviceIds = [...new Set(appts.map(a => a.service_id))];
-          const { data: services } = await supabase.from("services").select("id, name, price").in("id", serviceIds);
-          const serviceMap = new Map((services || []).map(s => [s.id, s]));
+      if (appts && appts.length > 0) {
+        const serviceIds = [...new Set(appts.map(a => a.service_id))];
+        const { data: services } = await supabase.from("services").select("id, name, price").in("id", serviceIds);
+        const serviceMap = new Map((services || []).map(s => [s.id, s]));
 
-          // Get user names
-          const userIds = [...new Set(appts.map(a => a.user_id))];
-          const { data: profiles } = await supabase.from("profiles").select("user_id, name").in("user_id", userIds);
-          const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
+        const userIds = [...new Set(appts.map(a => a.user_id))];
+        const { data: profiles } = await supabase.from("profiles").select("user_id, name").in("user_id", userIds);
+        const profileMap = new Map((profiles || []).map(p => [p.user_id, p.name]));
 
-          const items: AgendaItem[] = appts.map(a => {
-            const svc = serviceMap.get(a.service_id);
-            return {
-              hora: a.appointment_time,
-              cliente: profileMap.get(a.user_id) || "Cliente",
-              servico: svc?.name || "Serviço",
-              valor: `R$${Number(svc?.price || 0).toFixed(0)}`,
-              status: a.status,
-            };
-          }).sort((a, b) => a.hora.localeCompare(b.hora));
+        const items: AgendaItem[] = appts.map(a => {
+          const svc = serviceMap.get(a.service_id);
+          return {
+            id: a.id,
+            hora: a.appointment_time,
+            cliente: profileMap.get(a.user_id) || "Cliente",
+            servico: svc?.name || "Serviço",
+            valor: `R$${Number(svc?.price || 0).toFixed(0)}`,
+            status: a.status,
+          };
+        }).sort((a, b) => a.hora.localeCompare(b.hora));
 
-          setAgendaHoje(items);
+        setAgendaHoje(items);
 
-          const fat = appts
-            .filter(a => a.status === "confirmado")
-            .reduce((sum, a) => sum + Number(serviceMap.get(a.service_id)?.price || 0), 0);
-          setFaturamento(fat);
-        } else {
-          setAgendaHoje([]);
-          setFaturamento(0);
-        }
-      } catch (err) {
-        console.error("Erro ao carregar dashboard:", err);
+        const fat = appts
+          .filter(a => a.status === "confirmado")
+          .reduce((sum, a) => sum + Number(serviceMap.get(a.service_id)?.price || 0), 0);
+        setFaturamento(fat);
+      } else {
+        setAgendaHoje([]);
+        setFaturamento(0);
       }
-      setLoading(false);
-    };
+    } catch (err) {
+      console.error("Erro ao carregar dashboard:", err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchData();
+
+    // Real-time subscription for appointments
+    const channel = supabase
+      .channel('admin-dashboard-appointments')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const stats = [
@@ -100,8 +117,6 @@ export default function TabDashboard() {
 
   return (
     <div style={{ background:T.bg1, minHeight:"100%", fontFamily:T.DM, color:T.text }}>
-
-      {/* Header */}
       <div style={{ background:`linear-gradient(135deg,#1c1200 0%,${T.bg2} 100%)`, borderBottom:`1px solid ${T.border}`, padding:"24px 28px 20px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", top:-30, right:-30, width:140, height:140, borderRadius:"50%", background:"radial-gradient(circle,#c9a84c18 0%,transparent 70%)", pointerEvents:"none" }} />
         <div style={{ fontSize:11, letterSpacing:"0.18em", textTransform:"uppercase", color:T.goldD, fontWeight:700, marginBottom:4 }}>Painel</div>
@@ -110,12 +125,10 @@ export default function TabDashboard() {
       </div>
 
       <div style={{ padding:"24px 24px 40px" }}>
-
         {loading ? (
           <div style={{ textAlign:"center", padding:"40px 0", color:T.textD, fontSize:12 }}>Carregando...</div>
         ) : (
           <>
-            {/* Cards métricas */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:28 }}>
               {stats.map(s => (
                 <div key={s.label} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 14px", position:"relative", overflow:"hidden" }}>
@@ -127,7 +140,6 @@ export default function TabDashboard() {
               ))}
             </div>
 
-            {/* Agenda de hoje */}
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
               <span style={{ fontSize:10, fontWeight:700, letterSpacing:"0.18em", textTransform:"uppercase", color:T.gold }}>📋 Agenda de hoje</span>
               <div style={{ flex:1, height:1, background:`linear-gradient(to right,${T.goldD},transparent)` }} />
@@ -136,8 +148,8 @@ export default function TabDashboard() {
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {agendaHoje.length === 0 ? (
                 <div style={{ textAlign:"center", padding:"30px 0", color:T.textD, fontSize:12 }}>Nenhum agendamento hoje</div>
-              ) : agendaHoje.map((a, i) => (
-                <div key={i} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", display:"flex", alignItems:"center", gap:12 }}>
+              ) : agendaHoje.map((a) => (
+                <div key={a.id} style={{ background:T.bg3, border:`1px solid ${T.border}`, borderRadius:10, padding:"12px 14px", display:"flex", alignItems:"center", gap:12 }}>
                   <div style={{ fontSize:13, fontWeight:700, color:T.textM, width:38, flexShrink:0 }}>{a.hora}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:600, color:T.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.cliente}</div>
@@ -152,7 +164,6 @@ export default function TabDashboard() {
             </div>
           </>
         )}
-
       </div>
     </div>
   );
