@@ -15,33 +15,45 @@ const queryClient = new QueryClient();
 
 function AuthRedirect({ to }: { to: string }) {
   const [checking, setChecking] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
+  const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        setTarget(null);
+        setChecking(false);
+        return;
+      }
+      const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: session.user.id });
+      setTarget(isAdmin ? "/admin" : "/dashboard");
       setChecking(false);
     });
   }, []);
 
   if (checking) return null;
-  if (hasSession) return <Navigate to="/dashboard" replace />;
+  if (target) return <Navigate to={target} replace />;
   return <Navigate to={to} replace />;
 }
 
 function LoginGuard() {
   const [checking, setChecking] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
+  const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        setTarget(null);
+        setChecking(false);
+        return;
+      }
+      const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: session.user.id });
+      setTarget(isAdmin ? "/admin" : "/dashboard");
       setChecking(false);
     });
   }, []);
 
   if (checking) return null;
-  if (hasSession) return <Navigate to="/dashboard" replace />;
+  if (target) return <Navigate to={target} replace />;
   return <Login />;
 }
 

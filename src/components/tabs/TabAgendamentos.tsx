@@ -18,8 +18,8 @@ const T = {
   DM:    "'DM Sans', sans-serif",
 };
 
-const statusColor = (s: string) => s === "confirmado" ? T.green : T.gold;
-const FILTROS = ["todos", "confirmado", "pendente"];
+const statusColor = (s: string) => s === "confirmado" ? T.green : s === "cancelado" ? T.red : T.gold;
+const FILTROS = ["todos", "confirmado", "pendente", "cancelado"];
 
 interface Agendamento {
   id: string;
@@ -77,7 +77,25 @@ export default function TabAgendamentos() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('admin-agendamentos')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const visible = agendamentos.filter(a => filtro === "todos" || a.status === filtro);
 
@@ -99,7 +117,6 @@ export default function TabAgendamentos() {
   return (
     <div style={{ background:T.bg1, minHeight:"100%", fontFamily:T.DM, color:T.text }}>
 
-      {/* Header */}
       <div style={{ background:`linear-gradient(135deg,#001a0a 0%,${T.bg2} 60%)`, borderBottom:`1px solid #1a3a2a`, padding:"24px 28px 20px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", top:-30, right:-30, width:140, height:140, borderRadius:"50%", background:"radial-gradient(circle,#50a85020 0%,transparent 70%)", pointerEvents:"none" }} />
         <div style={{ fontSize:11, letterSpacing:"0.18em", textTransform:"uppercase", color:"#2a5a3a", fontWeight:700, marginBottom:4 }}>Gestão</div>
@@ -107,7 +124,6 @@ export default function TabAgendamentos() {
         <div style={{ fontSize:11, color:T.textD, letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2 }}>Todos os agendamentos registrados</div>
       </div>
 
-      {/* Mini métricas */}
       <div style={{ display:"flex", gap:10, padding:"16px 24px 4px" }}>
         <div style={{ flex:1, background:T.bg3, border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 12px" }}>
           <div style={{ fontSize:18, fontWeight:800, color:T.gold }}>{totalFiltro}</div>
@@ -119,7 +135,6 @@ export default function TabAgendamentos() {
         </div>
       </div>
 
-      {/* Filtros */}
       <div style={{ display:"flex", gap:6, flexWrap:"wrap", padding:"14px 24px 12px" }}>
         {FILTROS.map(f => (
           <button key={f}
@@ -129,7 +144,6 @@ export default function TabAgendamentos() {
         ))}
       </div>
 
-      {/* Lista */}
       <div style={{ display:"flex", flexDirection:"column", gap:8, padding:"4px 24px 32px" }}>
         {loading && <div style={{ textAlign:"center", padding:"40px 0", color:T.textD, fontSize:12 }}>Carregando...</div>}
         {!loading && visible.length === 0 && (
@@ -155,18 +169,20 @@ export default function TabAgendamentos() {
 
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
               <div style={{ fontSize:11, color:T.textM }}>📅 {a.data} &nbsp;·&nbsp; 🕐 {a.hora}</div>
-              {a.status === "pendente" && (
-                <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+              <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                {a.status === "pendente" && (
                   <button
                     style={{ fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase", background:"transparent", border:`1px solid ${T.green}`, color:T.green, padding:"4px 10px", borderRadius:4, cursor:"pointer", fontFamily:T.DM, fontWeight:600 }}
                     onClick={() => confirmar(a.id)}
                   >✓ Confirmar</button>
+                )}
+                {a.status !== "cancelado" && (
                   <button
                     style={{ fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase", background:"transparent", border:`1px solid ${T.red}`, color:T.red, padding:"4px 10px", borderRadius:4, cursor:"pointer", fontFamily:T.DM, fontWeight:600 }}
                     onClick={() => cancelar(a.id)}
                   >✕ Cancelar</button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
           </div>
